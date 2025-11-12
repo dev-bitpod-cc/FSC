@@ -316,3 +316,101 @@ class BatchMarkdownFormatter(MarkdownFormatter):
 
         logger.info(f"按來源分組完成: {len(results)} 個檔案")
         return results
+
+    def format_individual_files(
+        self,
+        data_type: str,
+        output_dir: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        將每篇公告格式化為獨立的 Markdown 檔案
+        (推薦用於 RAG 上傳,每篇公告都有獨立且語意化的檔名)
+
+        Args:
+            data_type: 資料類型 (announcements, laws, penalties)
+            output_dir: 輸出目錄 (預設: data/markdown/individual)
+
+        Returns:
+            統計資訊 {'total_items': ..., 'created_files': ..., 'output_dir': ...}
+        """
+        from pathlib import Path
+        import re
+
+        # 預設輸出目錄
+        if not output_dir:
+            output_dir = f'data/markdown/individual'
+
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"開始格式化 {data_type} 為獨立檔案...")
+        logger.info(f"輸出目錄: {output_path}")
+
+        # 讀取資料
+        items = self.handler.read_all(data_type)
+
+        if not items:
+            logger.warning(f"沒有找到 {data_type} 資料")
+            return {'total_items': 0, 'created_files': 0, 'output_dir': str(output_path)}
+
+        # 來源中文映射
+        source_mapping = {
+            'bank_bureau': '銀行局',
+            'securities_bureau': '證券期貨局',
+            'insurance_bureau': '保險局',
+            'inspection_bureau': '檢查局',
+            'unknown': '未分類'
+        }
+
+        def sanitize_filename(text: str, max_length: int = 50) -> str:
+            """清理檔名,移除不合法字元"""
+            # 移除或替換不合法字元
+            text = re.sub(r'[<>:"/\\|?*]', '_', text)
+            # 移除前後空白
+            text = text.strip()
+            # 限制長度
+            if len(text) > max_length:
+                text = text[:max_length]
+            return text
+
+        # 為每篇公告建立獨立檔案
+        created_files = []
+
+        for item in items:
+            try:
+                # 格式化單篇公告
+                md_content = self.format_announcement(item)
+
+                # 建立語意化的檔名
+                item_id = item.get('id', 'unknown')
+                title = item.get('title', '無標題')
+                source = item.get('metadata', {}).get('source', 'unknown')
+                source_cn = source_mapping.get(source, source)
+
+                # 清理標題
+                safe_title = sanitize_filename(title)
+
+                # 檔名格式: {ID}_{來源}_{標題}.md
+                filename = f"{item_id}_{source_cn}_{safe_title}.md"
+
+                # 寫入檔案
+                filepath = output_path / filename
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(md_content)
+
+                created_files.append(str(filepath))
+                logger.debug(f"建立檔案: {filename}")
+
+            except Exception as e:
+                logger.error(f"格式化項目失敗: {item.get('id', 'unknown')} - {e}")
+                continue
+
+        logger.info(f"完成! 共建立 {len(created_files)} 個檔案")
+        logger.info(f"輸出目錄: {output_path}")
+
+        return {
+            'total_items': len(items),
+            'created_files': len(created_files),
+            'output_dir': str(output_path),
+            'files': created_files[:10]  # 只返回前 10 個檔案路徑作為範例
+        }

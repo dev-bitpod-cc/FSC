@@ -82,6 +82,85 @@ class JSONLHandler:
         """
         self.write_items(source, [item], mode='a')
 
+    def append_items(
+        self,
+        source: str,
+        items: List[Dict[str, Any]],
+        check_duplicates: bool = True,
+        id_field: str = 'id',
+        update_index: bool = True
+    ) -> Dict[str, Any]:
+        """
+        增量追加多筆資料 (支援重複檢查)
+
+        Args:
+            source: 資料源名稱
+            items: 資料列表
+            check_duplicates: 是否檢查重複 (預設 True)
+            id_field: 用於檢查重複的欄位 (預設 'id')
+            update_index: 是否更新索引 (預設 True)
+
+        Returns:
+            統計資訊 {'added': ..., 'duplicates': ..., 'total': ...}
+        """
+        if not items:
+            logger.warning("沒有資料需要追加")
+            return {'added': 0, 'duplicates': 0, 'total': 0}
+
+        added = 0
+        duplicates = 0
+
+        # 如果需要檢查重複,先載入現有的 ID 集合
+        existing_ids = set()
+        if check_duplicates:
+            logger.info(f"載入現有資料以檢查重複...")
+            for item in self.stream_read(source):
+                if id_field in item:
+                    existing_ids.add(item[id_field])
+
+            logger.info(f"找到 {len(existing_ids)} 筆現有資料")
+
+        # 過濾重複項目
+        items_to_add = []
+        for item in items:
+            item_id = item.get(id_field)
+
+            if not item_id:
+                logger.warning(f"項目缺少 '{id_field}' 欄位,跳過")
+                continue
+
+            if check_duplicates and item_id in existing_ids:
+                logger.debug(f"跳過重複項目: {item_id}")
+                duplicates += 1
+                continue
+
+            items_to_add.append(item)
+            existing_ids.add(item_id)  # 加入集合,避免同一批次中的重複
+
+        # 寫入新資料
+        if items_to_add:
+            self.write_items(source, items_to_add, mode='a')
+            added = len(items_to_add)
+            logger.info(f"成功追加 {added} 筆新資料")
+        else:
+            logger.info("沒有新資料需要追加 (全部重複)")
+
+        # 更新索引
+        if update_index and added > 0:
+            try:
+                from src.storage.indexer import Indexer
+                indexer = Indexer(data_dir=str(self.data_dir))
+                indexer.build_index(source)
+                logger.info("索引已更新")
+            except Exception as e:
+                logger.warning(f"更新索引失敗: {e}")
+
+        return {
+            'added': added,
+            'duplicates': duplicates,
+            'total': len(items)
+        }
+
     def read_all(self, source: str) -> List[Dict[str, Any]]:
         """
         讀取所有資料

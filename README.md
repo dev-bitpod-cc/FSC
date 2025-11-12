@@ -7,10 +7,11 @@
 - ✅ 專案架構建立完成
 - ✅ 核心模組實作完成 (BaseCrawler, JSONL Storage, Index Manager)
 - ✅ 重要公告爬蟲實作完成 (支援 POST 分頁)
-- ✅ Markdown 格式化器完成
-- ✅ Gemini 上傳器完成
-- ✅ 測試成功 (45 筆公告資料)
-- ⏳ 準備完整爬取 (~7,500 筆)
+- ✅ Markdown 格式化器完成（支援獨立檔案格式）
+- ✅ Gemini 上傳器完成（重試、驗證、斷點續傳）
+- ✅ 增量更新支援（自動去重）
+- ✅ 測試成功 (150 筆公告資料上傳到 Gemini)
+- ✅ 準備就緒，可進行生產部署
 
 ## 🚀 快速開始
 
@@ -65,11 +66,18 @@ python scripts/test_crawler.py
 python scripts/test_markdown_formatter.py
 ```
 
-### 測試 Gemini 上傳 (需要 API Key)
+### 生產環境部署 (需要 API Key)
 
 ```bash
-# 上傳檔案到 Gemini File Search
-python scripts/test_gemini_uploader.py
+# 全量爬取與上傳（~7,500 筆公告）
+# 提示：背景執行請使用 nohup，詳見下方說明
+python scripts/run_full_production.py
+
+# 或使用完整上傳腳本（更多選項）
+python scripts/upload_to_gemini_complete.py --mode upload
+
+# 查看即時 log
+tail -f logs/fsc_crawler.log
 ```
 
 ## 📁 專案結構
@@ -133,7 +141,12 @@ fsc-crawler/
 - ✅ **增量更新**: 支援只爬取新增的資料
 - ✅ **AnnouncementCrawler**: 重要公告爬蟲 (POST 分頁)
 - ✅ **Markdown 格式化**: 轉換為適合 Gemini 的格式
-- ✅ **Gemini 上傳**: 批次上傳到 File Search Store
+- ✅ **智慧上傳器**: 自動分割、重試、驗證、清理的完整解決方案
+  - 自動偵測並分割大檔案 (預設 100 KB 以上)
+  - Exponential backoff 重試機制 (最多 3 次)
+  - 上傳狀態追蹤與記錄 (manifest.json)
+  - 完整性驗證報告
+  - 自動清理暫存分割檔案
 - ✅ **唯一 ID 生成**: 格式 `fsc_ann_YYYYMMDD_NNNN`
 - ✅ **Brotli 解壓縮**: 處理金管會伺服器回應
 
@@ -213,6 +226,41 @@ gemini:
 
 ## 📖 使用範例
 
+### 上傳到 Gemini File Search
+
+```python
+from src.uploader.gemini_uploader import GeminiUploader
+
+# 初始化上傳器
+uploader = GeminiUploader(
+    api_key='your_api_key',
+    store_name='fsc-announcements',
+    max_retries=3,             # 失敗時最多重試 3 次
+    retry_delay=2.0            # 重試延遲基數 (exponential backoff)
+)
+
+# 上傳整個目錄
+stats = uploader.upload_directory(
+    directory='data/markdown/individual',
+    pattern='*.md',
+    delay=1.0,              # 每次上傳間隔 1 秒
+    skip_existing=True      # 跳過已上傳的檔案（斷點續傳）
+)
+
+# 驗證上傳完整性
+report = uploader.verify_upload_completeness()
+print(f"成功: {report['successful']}/{report['total']}")
+print(f"失敗: {report['failed']}/{report['total']}")
+
+# 取得失敗的上傳
+failed = uploader.get_failed_uploads()
+for item in failed:
+    print(f"失敗檔案: {item['filepath']}")
+    print(f"錯誤: {item['error']}")
+```
+
+**注意**: 每篇公告已格式化為獨立 Markdown 檔案（1-10 KB），無需分割。
+
 ### 爬取重要公告
 
 ```python
@@ -274,9 +322,10 @@ python scripts/run_crawler.py
 - [x] 網站分析 (POST 分頁機制)
 - [x] AnnouncementCrawler 實作
 - [x] Markdown 格式化器
-- [x] 45 筆測試 (3 頁)
-- [x] Gemini 上傳器
+- [x] 150 筆測試 (10 頁)
+- [x] 智慧上傳器 (自動分割、重試、驗證、清理)
 - [x] ID 生成與索引
+- [x] 成功上傳 150 筆公告到 Gemini File Search
 - [ ] 全量爬取 (~7,500 筆)
 - [ ] RAG 查詢介面
 - [ ] 法規與裁罰爬蟲
