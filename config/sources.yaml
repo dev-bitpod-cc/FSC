@@ -1,0 +1,47 @@
+# 金管會資料源配置
+
+# 資料源清單
+sources:
+  # 重要公告 (當前實作)
+  announcements:
+    enabled: true
+    display_name: "重要公告"
+    base_url: "https://www.fsc.gov.tw/ch/home.jsp"
+    list_page_id: 97
+    parent_path: "0,2"
+    total_pages: 500
+    per_page: 15  # 待確認:可能可調整為 25/50/100
+
+  # 法規查詢 (預留)
+  laws:
+    enabled: false
+    display_name: "法規查詢"
+    base_url: "https://www.fsc.gov.tw"
+    # URL 格式待確認
+
+  # 裁罰案件 (預留)
+  penalties:
+    enabled: false
+    display_name: "裁罰案件"
+    base_url: "https://www.fsc.gov.tw"
+    # URL 格式待確認
+
+# 資料來源單位對應
+source_units:
+  "金管會": "fsc_main"
+  "銀行局": "bank_bureau"
+  "證期局": "securities_bureau"
+  "證券期貨局": "securities_bureau"
+  "保險局": "insurance_bureau"
+  "檢查局": "inspection_bureau"
+  "中央存保公司": "cdic"
+  "中央存款保險公司": "cdic"
+
+# 公告類型對應
+announcement_categories:
+  "修正": "amendment"
+  "訂定": "enactment"
+  "廢止": "abolition"
+  "預告": "advance_notice"
+  "解釋令": "interpretation"
+  "函": "official_letter"

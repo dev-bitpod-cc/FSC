@@ -1,0 +1,25 @@
+# Core Dependencies
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+brotli>=1.1.0  # 支援 Brotli 壓縮解碼
+
+# Gemini Integration
+google-genai>=0.3.0
+
+# Data Processing
+python-dateutil>=2.8.0
+pyyaml>=6.0
+
+# Utilities
+python-dotenv>=1.0.0
+loguru>=0.7.0
+tqdm>=4.66.0
+
+# Browser Automation (for JavaScript pagination)
+selenium>=4.15.0
+webdriver-manager>=4.0.0  # Automatic WebDriver management
+
+# Optional: Advanced Features
+# pdfplumber>=0.10.0  # If PDF extraction needed
+# pandas>=2.1.0  # If data analysis needed
