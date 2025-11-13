@@ -33,7 +33,7 @@ from src.storage.index_manager import IndexManager
 from src.processor.markdown_formatter import BatchMarkdownFormatter
 from src.uploader.gemini_uploader import GeminiUploader
 from src.utils.logger import setup_logger
-from src.utils.config_loader import load_config
+from src.utils.config_loader import ConfigLoader
 from dotenv import load_dotenv
 import os
 import re
@@ -59,7 +59,8 @@ def main():
     load_dotenv()
 
     # 載入配置
-    config = load_config()
+    config_loader = ConfigLoader()
+    config = config_loader.load_yaml('crawler.yaml')
 
     # 參數
     api_key = os.getenv('GEMINI_API_KEY')

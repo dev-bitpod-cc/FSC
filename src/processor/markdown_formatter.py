@@ -429,17 +429,24 @@ class BatchMarkdownFormatter(MarkdownFormatter):
                 # 格式化單篇公告
                 md_content = self.format_announcement(item)
 
-                # 建立語意化的檔名
+                # 建立簡潔的檔名（用於 Gemini File Search 顯示）
                 item_id = item.get('id', 'unknown')
-                title = item.get('title', '無標題')
                 source = item.get('metadata', {}).get('source', 'unknown')
                 source_cn = source_mapping.get(source, source)
 
-                # 清理標題
-                safe_title = sanitize_filename(title)
+                # 單位簡稱映射（提升查詢結果可讀性）
+                source_abbr = {
+                    '銀行局': '銀',
+                    '保險局': '保',
+                    '證券期貨局': '證期',
+                    '檢查局': '檢',
+                    '未分類': '其他'
+                }
+                source_short = source_abbr.get(source_cn, source_cn[:2] if source_cn else '未知')
 
-                # 檔名格式: {ID}_{來源}_{標題}.md
-                filename = f"{item_id}_{source_cn}_{safe_title}.md"
+                # 檔名格式: {ID}_{單位簡稱}.md
+                # 範例: fsc_ann_20250508_0001_證期.md
+                filename = f"{item_id}_{source_short}.md"
 
                 # 寫入檔案
                 filepath = output_path / filename
