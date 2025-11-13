@@ -20,6 +20,18 @@ storage:
   enable_metadata: true
   backup_enabled: true
 
+# 附件下載設定
+attachments:
+  download: true  # 是否下載附件
+  types:  # 下載的檔案類型
+    - pdf
+    - doc
+    - docx
+  max_size_mb: 50  # 單檔最大大小 (MB)
+  save_path: "data/attachments"  # 儲存路徑
+  retry_on_error: true  # 下載失敗時重試
+  max_retries: 3  # 最大重試次數
+
 # Gemini 上傳設定
 gemini:
   batch_size: 100

@@ -523,3 +523,90 @@ class GeminiUploader:
                 })
 
         return failed
+
+    def upload_announcement_with_attachments(
+        self,
+        markdown_path: str,
+        attachments_dir: Optional[str] = None,
+        delay: float = 2.0
+    ) -> Dict[str, Any]:
+        """
+        上傳公告及其附件
+
+        Args:
+            markdown_path: 公告 Markdown 檔案路徑
+            attachments_dir: 附件目錄路徑（如果為 None，從 Markdown 路徑推導）
+            delay: 每次上傳間隔秒數
+
+        Returns:
+            上傳結果 {
+                'announcement_id': file_id,
+                'attachments': [file_id1, file_id2, ...],
+                'total_files': N
+            }
+        """
+        from pathlib import Path
+        import time
+
+        result = {
+            'announcement_id': None,
+            'attachments': [],
+            'total_files': 0,
+            'errors': []
+        }
+
+        # 確保 Store 存在
+        if not self.store_id:
+            self.get_or_create_store()
+
+        # 上傳公告 Markdown
+        logger.info(f"上傳公告: {markdown_path}")
+        ann_file_id = self.upload_file(markdown_path)
+
+        if ann_file_id:
+            self.add_file_to_store(ann_file_id)
+            result['announcement_id'] = ann_file_id
+            result['total_files'] += 1
+        else:
+            result['errors'].append(f"公告上傳失敗: {markdown_path}")
+            return result
+
+        # 等待
+        time.sleep(delay)
+
+        # 推導附件目錄
+        if attachments_dir is None:
+            # 從 Markdown 路徑推導
+            # data/markdown/announcements/fsc_ann_XXX.md
+            # -> data/attachments/announcements/fsc_ann_XXX/
+            md_path = Path(markdown_path)
+            doc_id = md_path.stem  # fsc_ann_XXX
+
+            attachments_dir = Path('data/attachments/announcements') / doc_id
+
+        att_dir = Path(attachments_dir)
+
+        # 上傳附件（如果目錄存在）
+        if att_dir.exists() and att_dir.is_dir():
+            # 支援的附件類型
+            attachment_patterns = ['*.pdf', '*.doc', '*.docx']
+
+            for pattern in attachment_patterns:
+                for att_file in att_dir.glob(pattern):
+                    logger.info(f"上傳附件: {att_file.name}")
+
+                    att_file_id = self.upload_file(str(att_file))
+
+                    if att_file_id:
+                        self.add_file_to_store(att_file_id)
+                        result['attachments'].append(att_file_id)
+                        result['total_files'] += 1
+                    else:
+                        result['errors'].append(f"附件上傳失敗: {att_file.name}")
+
+                    # 等待（附件上傳較慢）
+                    time.sleep(delay)
+
+        logger.info(f"✓ 上傳完成: {result['total_files']} 個檔案")
+
+        return result

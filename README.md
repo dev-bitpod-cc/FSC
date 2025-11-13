@@ -7,11 +7,12 @@
 - ✅ 專案架構建立完成
 - ✅ 核心模組實作完成 (BaseCrawler, JSONL Storage, Index Manager)
 - ✅ 重要公告爬蟲實作完成 (支援 POST 分頁)
+- ✅ **附件自動下載功能完成**（支援 PDF/DOC/DOCX，包含修正條文對照表）
 - ✅ Markdown 格式化器完成（支援獨立檔案格式）
-- ✅ Gemini 上傳器完成（重試、驗證、斷點續傳）
+- ✅ Gemini 上傳器完成（重試、驗證、斷點續傳、附件上傳）
 - ✅ 增量更新支援（自動去重）
 - ✅ 測試成功 (150 筆公告資料上傳到 Gemini)
-- ✅ 準備就緒，可進行生產部署
+- ✅ 準備就緒，可進行生產部署（含附件）
 
 ## 🚀 快速開始
 
@@ -119,6 +120,7 @@ fsc-crawler/
 │
 ├── data/                     # 資料目錄 (gitignore)
 │   ├── announcements/        # 重要公告
+│   ├── attachments/          # 附件下載（PDF/DOC/DOCX）✅
 │   ├── laws/                 # 法規 (預留)
 │   └── penalties/            # 裁罰 (預留)
 │
@@ -140,6 +142,12 @@ fsc-crawler/
 - ✅ **索引系統**: 提供日期、來源、ID 的快速查詢
 - ✅ **增量更新**: 支援只爬取新增的資料
 - ✅ **AnnouncementCrawler**: 重要公告爬蟲 (POST 分頁)
+- ✅ **附件自動下載**: 下載並儲存 PDF/DOC/DOCX 附件
+  - 支援修正條文對照表等重要文件
+  - 自動重試機制 (最多 3 次，指數退避)
+  - 檔案大小限制 (預設 50 MB)
+  - 智慧型檔案類型識別 (處理 URL 參數)
+  - 串流下載支援大檔案
 - ✅ **Markdown 格式化**: 轉換為適合 Gemini 的格式
 - ✅ **智慧上傳器**: 自動分割、重試、驗證、清理的完整解決方案
   - 自動偵測並分割大檔案 (預設 100 KB 以上)
@@ -147,6 +155,7 @@ fsc-crawler/
   - 上傳狀態追蹤與記錄 (manifest.json)
   - 完整性驗證報告
   - 自動清理暫存分割檔案
+  - **支援附件上傳** (Markdown + PDF 同時上傳到同一 Store)
 - ✅ **唯一 ID 生成**: 格式 `fsc_ann_YYYYMMDD_NNNN`
 - ✅ **Brotli 解壓縮**: 處理金管會伺服器回應
 
@@ -213,6 +222,18 @@ storage:
   format: "jsonl"
   enable_index: true
 
+# 附件下載設定
+attachments:
+  download: true  # 是否下載附件
+  types:  # 下載的檔案類型
+    - pdf
+    - doc
+    - docx
+  max_size_mb: 50  # 單檔最大大小 (MB)
+  save_path: "data/attachments"  # 儲存路徑
+  retry_on_error: true  # 下載失敗時重試
+  max_retries: 3  # 最大重試次數
+
 gemini:
   batch_size: 100
   chunking:
@@ -260,6 +281,34 @@ for item in failed:
 ```
 
 **注意**: 每篇公告已格式化為獨立 Markdown 檔案（1-10 KB），無需分割。
+
+### 上傳公告及附件
+
+```python
+from src.uploader.gemini_uploader import GeminiUploader
+
+uploader = GeminiUploader(
+    api_key='your_api_key',
+    store_name='fsc-announcements'
+)
+
+# 上傳單個公告及其附件（Markdown + PDFs）
+result = uploader.upload_announcement_with_attachments(
+    markdown_path='data/markdown/individual/fsc_ann_20251112_0001.md',
+    attachments_dir=None,  # 自動從 ID 推導附件目錄
+    delay=2.0
+)
+
+print(f"上傳完成:")
+print(f"  公告 ID: {result['announcement_id']}")
+print(f"  附件數: {len(result['attachments'])}")
+print(f"  總檔案: {result['total_files']}")
+
+# Gemini 會自動:
+# - 合併 Markdown 和 PDF 內容進行語義搜尋
+# - 在查詢時同時檢索公告正文和附件內容
+# - 提供完整的條文修正對照資訊
+```
 
 ### 爬取重要公告
 

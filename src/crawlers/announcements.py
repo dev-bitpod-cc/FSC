@@ -179,13 +179,30 @@ class AnnouncementCrawler(BaseFSCCrawler):
             for link in soup.select('a'):
                 href = link.get('href', '')
                 if any(ext in href.lower() for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.odt']):
+                    # 提取檔案類型（處理 URL 參數如 .pdf&flag=doc）
+                    file_type = 'unknown'
+                    if '.' in href:
+                        # 取得副檔名部分
+                        ext_part = href.split('.')[-1].lower()
+                        # 如果有 URL 參數（&），只取第一部分
+                        if '&' in ext_part:
+                            file_type = ext_part.split('&')[0]
+                        elif '?' in ext_part:
+                            file_type = ext_part.split('?')[0]
+                        else:
+                            file_type = ext_part
+
                     attachments.append({
                         'name': clean_text(link.get_text()),
                         'url': urljoin(self.base_url, href),
-                        'type': href.split('.')[-1].lower() if '.' in href else 'unknown'
+                        'type': file_type
                     })
 
             detail['attachments'] = attachments
+
+            # 下載附件（如果配置啟用）
+            if attachments and self.config.get('attachments', {}).get('download', False):
+                self._download_attachments(detail)
 
             # 提取 metadata
             from ..utils.helpers import extract_announcement_number, detect_category
@@ -258,3 +275,86 @@ class AnnouncementCrawler(BaseFSCCrawler):
         except Exception as e:
             logger.error(f"列表頁解析失敗: Page {page} - {e}")
             return []
+
+    def _download_attachments(self, detail: Dict[str, Any]) -> None:
+        """
+        下載附件
+
+        Args:
+            detail: 公告詳細資料（會直接修改其中的 attachments）
+        """
+        from pathlib import Path
+        import time
+
+        att_config = self.config.get('attachments', {})
+        allowed_types = att_config.get('types', ['pdf', 'doc', 'docx'])
+        max_size_mb = att_config.get('max_size_mb', 50)
+        save_path = Path(att_config.get('save_path', 'data/attachments'))
+        max_retries = att_config.get('max_retries', 3)
+
+        # 建立附件目錄
+        doc_id = detail.get('id', 'unknown')
+        att_dir = save_path / 'announcements' / doc_id
+        att_dir.mkdir(parents=True, exist_ok=True)
+
+        for i, att in enumerate(detail.get('attachments', []), 1):
+            att_type = att.get('type', 'unknown')
+            att_url = att.get('url', '')
+            att_name = att.get('name', 'unknown')
+
+            # 檢查是否為允許的類型
+            if att_type not in allowed_types:
+                logger.debug(f"跳過不支援的附件類型: {att_type} - {att_name}")
+                continue
+
+            # 檔名
+            safe_filename = f"attachment_{i}.{att_type}"
+            filepath = att_dir / safe_filename
+
+            # 重試下載
+            for retry in range(max_retries):
+                try:
+                    if retry > 0:
+                        logger.info(f"重試下載 ({retry}/{max_retries}): {att_name}")
+                        time.sleep(2 ** retry)  # Exponential backoff
+
+                    # 下載
+                    response = self.session.get(
+                        att_url,
+                        verify=False,
+                        timeout=self.config['http']['timeout'],
+                        stream=True
+                    )
+                    response.raise_for_status()
+
+                    # 檢查檔案大小
+                    content_length = response.headers.get('content-length')
+                    if content_length:
+                        size_mb = int(content_length) / (1024 * 1024)
+                        if size_mb > max_size_mb:
+                            logger.warning(f"附件超過大小限制 ({size_mb:.1f} MB > {max_size_mb} MB): {att_name}")
+                            att['download_error'] = f'檔案過大 ({size_mb:.1f} MB)'
+                            break
+
+                    # 儲存
+                    with open(filepath, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+                    # 記錄下載資訊
+                    file_size = filepath.stat().st_size
+                    att['local_path'] = str(filepath)
+                    att['size_bytes'] = file_size
+                    att['downloaded'] = True
+
+                    logger.info(f"✓ 下載附件 [{i}]: {att_name} ({file_size / 1024:.1f} KB)")
+                    break  # 成功，跳出重試迴圈
+
+                except Exception as e:
+                    if retry == max_retries - 1:
+                        # 最後一次重試也失敗
+                        logger.error(f"✗ 下載附件失敗 [{i}]: {att_name} - {e}")
+                        att['download_error'] = str(e)
+                        att['downloaded'] = False
+                    else:
+                        logger.warning(f"下載失敗 (重試 {retry + 1}/{max_retries}): {att_name} - {e}")

@@ -228,14 +228,83 @@ for item in storage.stream_read('announcements'):
 4. 資料自動儲存到 `data/new_source/`
 5. 索引自動建立
 
+## 最新更新 (2025-11-13)
+
+### ✅ 附件自動下載和上傳功能
+
+已完成附件自動下載和上傳功能，大幅提升 Gemini File Search 查詢效果。
+
+**實作內容**：
+- `config/crawler.yaml` - 新增 `attachments` 配置區塊
+- `src/crawlers/announcements.py` - 新增 `_download_attachments()` 方法
+- `src/uploader/gemini_uploader.py` - 新增 `upload_announcement_with_attachments()` 方法
+
+**核心功能**：
+- 自動下載公告附件（PDF、DOC、DOCX）
+- 智慧型檔案類型識別（處理 `pdf&flag=doc` 等 URL 參數）
+- 指數退避重試機制（最多 3 次）
+- 檔案大小限制（預設 50 MB）
+- 串流下載支援大檔案
+- Markdown + PDF 同時上傳到同一個 Gemini Store
+
+**重要性**：
+- 修正條文對照表（新舊條文並列）包含在附件中
+- 對於理解「改了什麼」至關重要
+- Gemini File Search 原生支援 PDF，可自動提取和索引
+- 查詢時 Gemini 會同時檢索公告正文和附件內容
+
+**配置範例**：
+```yaml
+# config/crawler.yaml
+attachments:
+  download: true
+  types: ['pdf', 'doc', 'docx']
+  max_size_mb: 50
+  save_path: "data/attachments"
+  retry_on_error: true
+  max_retries: 3
+```
+
+**使用範例**：
+```python
+# 上傳公告及附件
+from src.uploader.gemini_uploader import GeminiUploader
+
+uploader = GeminiUploader(api_key='...', store_name='fsc-announcements')
+result = uploader.upload_announcement_with_attachments(
+    markdown_path='data/markdown/individual/fsc_ann_20251112_0001.md',
+    attachments_dir=None,  # 自動從文件 ID 推導
+    delay=2.0
+)
+```
+
+**測試與部署**：
+- 測試腳本：`scripts/test_attachment_download.py`
+- 部署指南：`docs/deployment_with_attachments.md`
+- 策略分析：`docs/attachment_handling_strategy.md`
+
+**檔案結構**：
+```
+data/
+├── announcements/
+│   └── raw.jsonl              # 包含附件元資料
+└── attachments/
+    └── announcements/
+        └── fsc_ann_YYYYMMDD_NNNN/
+            ├── attachment_1.pdf  # 修正說明
+            ├── attachment_2.pdf  # 對照表
+            └── attachment_3.pdf  # 修正條文
+```
+
+---
+
 ## 待實作功能
 
-- [ ] 修正 AnnouncementCrawler 解析問題 (當前已知 bug)
-- [ ] Markdown 格式化器 (`src/processor/formatters/`)
-- [ ] Gemini 批次上傳器 (`src/uploader/`)
 - [ ] 法規查詢爬蟲 (`src/crawlers/laws.py`)
 - [ ] 裁罰案件爬蟲 (`src/crawlers/penalties.py`)
 - [ ] RAG 查詢介面
+- [ ] 文件關係偵測（甲文件取代乙文件）
+- [ ] 時效性排序（Markdown 標註 + Prompt Engineering）
 
 ## 除錯工具
 
