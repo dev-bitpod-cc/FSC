@@ -215,11 +215,16 @@ scripts/
 ├── test_penalty_markdown_formatter.py  # 裁罰格式化測試 ✅
 ├── test_penalty_individual_files.py    # 獨立檔案格式化測試 ✅
 ├── test_temporal_annotation.py         # 時效性標註測試 ✅
+├── upload_to_gemini.py                 # 通用上傳腳本（支援公告/裁罰）✅
+├── test_upload_markdown_generation.py  # 上傳腳本測試 ✅
+├── test_integration_full.py            # 完整整合測試腳本 ✅
+├── test_multi_store_query.py           # 多 Store API 測試 ✅
 └── analyze_attachments.py              # 附件統計分析 ✅
 
 docs/
 ├── penalties_data_structure.md         # 裁罰資料結構設計 ✅
 ├── multi_store_query_architecture.md   # 多 Store 查詢架構 ✅
+├── integration_testing_guide.md        # 整合測試指南 ✅
 ├── attachment_handling_strategy.md     # 附件處理策略 ✅
 ├── deployment_with_attachments.md      # 附件部署指南 ✅
 └── implementation_summary.md           # 本文件 ✅
@@ -390,10 +395,15 @@ python scripts/upload_to_gemini.py \
    # 預期：返回 2025 年的公告，不是 2023 年
    ```
 
-**待實作**：
-- [ ] `scripts/test_multi_store_query.py`（整合測試腳本）
-- [ ] System Instruction 模板
+**已完成**：
+- ✅ `scripts/test_integration_full.py`（完整整合測試腳本）
+- ✅ `scripts/test_multi_store_query.py`（多 Store API 測試）
+- ✅ `docs/integration_testing_guide.md`（整合測試指南）
+
+**待實作**（中優先級）：
+- [ ] System Instruction 模板庫
 - [ ] 查詢範例庫
+- [ ] 使用者文檔
 
 ---
 
@@ -405,8 +415,10 @@ python scripts/upload_to_gemini.py \
 |------|------|---------|
 | 裁罰 Markdown 格式化器 | ✅ | 已完成 |
 | 公告時效性標註機制 | ✅ | 已完成 |
-| 上傳腳本更新（支援裁罰） | ⏳ | 1 小時 |
-| 整合測試腳本 | ⏳ | 1-2 小時 |
+| 上傳腳本更新（支援裁罰） | ✅ | 已完成 |
+| 整合測試腳本 | ✅ | 已完成 |
+
+**🎉 所有高優先級項目已完成！**
 
 ### 中優先級（優化體驗）
 

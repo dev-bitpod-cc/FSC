@@ -24,8 +24,9 @@
 - ✅ 時效性處理機制（Markdown 標註 + System Instruction）
 - ✅ 查詢範圍控制（支援單一或多 Store 查詢）
 - ✅ 完整架構文檔
+- ✅ 整合測試腳本
 
-**準備就緒，可進行生產部署！**
+**🎉 核心功能開發完成，準備生產部署！**
 
 ## 🚀 快速開始
 
@@ -88,6 +89,20 @@ python scripts/test_penalty_markdown_formatter.py
 # 測試時效性標註功能
 python scripts/test_temporal_annotation.py
 ```
+
+### 整合測試
+
+完整測試多 Store 查詢、時效性標註等功能（**需要 Gemini API Key**）：
+
+```bash
+# 執行完整整合測試
+python scripts/test_integration_full.py
+
+# 執行測試並在完成後清理測試 Stores
+python scripts/test_integration_full.py --cleanup
+```
+
+詳見 `docs/integration_testing_guide.md` 了解完整測試指南。
 
 ### 生產環境部署 (需要 API Key)
 
