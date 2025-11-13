@@ -8,6 +8,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **專案使用繁體中文**,所有文檔、註解、變數命名請遵循此慣例。
 
+## 最新更新 (2025-11-13)
+
+### ✅ 裁罰案件系統完成
+- 實作裁罰案件爬蟲 (`src/crawlers/penalties.py`)
+- 實作裁罰 Markdown 格式化器 (`src/processor/penalty_markdown_formatter.py`)
+- 完成測試腳本與驗證
+
+### ✅ 時效性標註機制完成
+- 實作版本追蹤器 (`src/processor/version_tracker.py`)
+- 修改公告格式化器，加入時效性標註
+- 自動識別最新版本與過時版本
+- 顯示修正歷程
+
+### ✅ 多 Store 查詢架構設計完成
+- 完整架構文檔 (`docs/multi_store_query_architecture.md`)
+- 支援獨立或同時查詢公告/裁罰
+- 時效性處理機制
+- 參考文件數量控制方案
+
+詳見 `docs/implementation_summary.md` 了解完整實作狀態。
+
 ## 環境設定
 
 ### 初始設定

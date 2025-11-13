@@ -19,12 +19,15 @@ sources:
     base_url: "https://www.fsc.gov.tw"
     # URL 格式待確認
 
-  # 裁罰案件 (預留)
+  # 裁罰案件
   penalties:
-    enabled: false
+    enabled: true
     display_name: "裁罰案件"
-    base_url: "https://www.fsc.gov.tw"
-    # URL 格式待確認
+    base_url: "https://www.fsc.gov.tw/ch/home.jsp"
+    list_page_id: 131
+    parent_path: "0,2"
+    total_pages: 42
+    per_page: 15
 
 # 資料來源單位對應
 source_units:
@@ -45,3 +48,17 @@ announcement_categories:
   "預告": "advance_notice"
   "解釋令": "interpretation"
   "函": "official_letter"
+
+# 裁罰案件違規類型對應
+penalty_categories:
+  "內控": "internal_control_violation"
+  "內部控制": "internal_control_violation"
+  "法令遵循": "compliance_violation"
+  "資本適足": "capital_adequacy"
+  "洗錢防制": "aml_violation"
+  "資訊安全": "information_security"
+  "業務招攬": "business_solicitation"
+  "保險金給付": "claim_payment"
+  "客戶保護": "customer_protection"
+  "詐欺": "fraud"
+  "內線交易": "insider_trading"

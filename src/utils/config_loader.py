@@ -83,3 +83,8 @@ class ConfigLoader:
         """取得公告類型對應表"""
         sources_config = self.load_yaml("sources.yaml")
         return sources_config.get('announcement_categories', {})
+
+    def get_penalty_category_mapping(self) -> Dict[str, str]:
+        """取得裁罰案件違規類型對應表"""
+        sources_config = self.load_yaml("sources.yaml")
+        return sources_config.get('penalty_categories', {})

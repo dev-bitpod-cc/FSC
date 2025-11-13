@@ -179,3 +179,149 @@ def extract_announcement_number(text: str) -> Optional[str]:
             return match.group(0)
 
     return None
+
+
+def extract_penalty_amount(text: str) -> tuple[Optional[int], Optional[str]]:
+    """
+    從文字中提取處分金額
+
+    Args:
+        text: 文字內容
+
+    Returns:
+        (金額數值, 金額文字)
+        例如: (3000000, "新臺幣300萬元")
+    """
+    # 匹配模式：新臺幣XXX萬元、新臺幣XXX元
+    patterns = [
+        r'新臺幣(\d+)萬元',
+        r'新台幣(\d+)萬元',
+        r'新臺幣(\d+)元',
+        r'新台幣(\d+)元',
+        r'罰鍰[^\d]*(\d+)萬元',
+        r'罰鍰[^\d]*(\d+)元',
+    ]
+
+    for i, pattern in enumerate(patterns):
+        match = re.search(pattern, text)
+        if match:
+            amount_str = match.group(1)
+            amount = int(amount_str)
+
+            # 如果是萬元，轉換為元
+            if '萬元' in match.group(0):
+                amount = amount * 10000
+
+            return amount, match.group(0)
+
+    return None, None
+
+
+def extract_legal_basis(text: str) -> list[str]:
+    """
+    從文字中提取法條依據
+
+    Args:
+        text: 文字內容
+
+    Returns:
+        法條清單
+        例如: ["保險法第171條之1第4項", "保險法第148條之3第1項"]
+    """
+    legal_basis = []
+
+    # 匹配模式：XXX法第XXX條
+    patterns = [
+        r'[^。，\n]+法第\d+條[^。，\n]*',
+        r'[^。，\n]+辦法第\d+條[^。，\n]*',
+        r'[^。，\n]+規則第\d+條[^。，\n]*',
+    ]
+
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            # 清理文字
+            cleaned = match.strip()
+            # 避免重複
+            if cleaned and cleaned not in legal_basis:
+                legal_basis.append(cleaned)
+
+    return legal_basis
+
+
+def extract_inspection_report_number(text: str) -> Optional[str]:
+    """
+    從文字中提取檢查報告編號
+
+    Args:
+        text: 文字內容
+
+    Returns:
+        檢查報告編號
+        例如: "112I018"
+    """
+    # 匹配模式：（編號：112I018）或 編號：112I018
+    patterns = [
+        r'編號[：:]\s*([A-Z0-9]+)',
+        r'[（(]編號[：:]\s*([A-Z0-9]+)[）)]',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def detect_penalty_category(title: str, content: str, category_mapping: Dict[str, str]) -> str:
+    """
+    偵測裁罰案件違規類型
+
+    Args:
+        title: 標題
+        content: 內容
+        category_mapping: 類型映射字典
+
+    Returns:
+        違規類型標準名稱
+    """
+    # 合併標題和內容（只取前1000字元以提升效率）
+    text = f"{title} {content[:1000]}"
+
+    # 檢查關鍵字
+    for keyword, category in category_mapping.items():
+        if keyword in text:
+            return category
+
+    return 'other'
+
+
+def extract_penalized_entity_type(source: str, title: str) -> str:
+    """
+    推斷被處分人的業別類型
+
+    Args:
+        source: 資料來源（如「保險局」）
+        title: 標題
+
+    Returns:
+        業別類型: insurance, bank, securities, other
+    """
+    # 根據來源判斷
+    if '保險' in source:
+        return 'insurance'
+    elif '銀行' in source:
+        return 'bank'
+    elif '證期' in source or '證券' in source:
+        return 'securities'
+
+    # 根據標題判斷
+    if any(keyword in title for keyword in ['保險', '壽險', '產險']):
+        return 'insurance'
+    elif any(keyword in title for keyword in ['銀行', '商業銀行', '信用合作社']):
+        return 'bank'
+    elif any(keyword in title for keyword in ['證券', '期貨', '投信', '投顧']):
+        return 'securities'
+
+    return 'other'

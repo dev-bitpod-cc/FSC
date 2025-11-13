@@ -1,30 +1,26 @@
-"""Markdown 格式化器 - 將爬蟲資料轉換為 Gemini 友善的 Markdown 格式"""
+"""裁罰案件 Markdown 格式化器 - 將裁罰案件資料轉換為 Gemini 友善的 Markdown 格式"""
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from loguru import logger
-from .version_tracker import VersionTracker
 
 
-class MarkdownFormatter:
-    """Markdown 格式化器"""
+class PenaltyMarkdownFormatter:
+    """裁罰案件 Markdown 格式化器"""
 
-    def __init__(self, version_tracker: Optional[VersionTracker] = None):
-        """
-        初始化格式化器
-
-        Args:
-            version_tracker: 版本追蹤器（用於時效性標註）
-        """
-        self.version_tracker = version_tracker
+    def __init__(self):
+        """初始化格式化器"""
         self.category_names = {
-            'amendment': '法規修正',
-            'regulation': '法規發布',
-            'announcement': '一般公告',
-            'penalty': '裁罰案件',
-            'press_release': '新聞稿',
-            'market_info': '市場資訊',
-            'other': '其他'
+            'internal_control_violation': '內部控制缺失',
+            'compliance_violation': '法令遵循缺失',
+            'capital_adequacy': '資本適足率不足',
+            'aml_violation': '洗錢防制缺失',
+            'information_security': '資訊安全缺失',
+            'consumer_protection': '消費者保護缺失',
+            'financial_reporting': '財務報告不實',
+            'licensing_violation': '許可執照違規',
+            'operational_violation': '業務經營違規',
+            'other': '其他違規'
         }
 
         self.source_names = {
@@ -36,12 +32,22 @@ class MarkdownFormatter:
             'unknown': '未分類'
         }
 
-    def format_announcement(self, item: Dict[str, Any]) -> str:
+        self.entity_type_names = {
+            'insurance': '保險業',
+            'bank': '銀行業',
+            'securities': '證券期貨業',
+            'trust': '信託業',
+            'bills_finance': '票券業',
+            'financial_holding': '金控公司',
+            'other': '其他'
+        }
+
+    def format_penalty(self, item: Dict[str, Any]) -> str:
         """
-        格式化單筆公告為 Markdown
+        格式化單筆裁罰案件為 Markdown
 
         Args:
-            item: 公告資料
+            item: 裁罰案件資料
 
         Returns:
             Markdown 格式的文字
@@ -52,24 +58,22 @@ class MarkdownFormatter:
         title = item.get('title', '無標題')
         md_lines.append(f"# {title}\n")
 
-        # 時效性標註（如果有 version_tracker）
-        if self.version_tracker:
-            version_info = self.version_tracker.get_version_info(item)
+        # 提取 metadata
+        metadata = item.get('metadata', {})
 
-            if version_info['is_latest']:
-                date = item.get('date', '')
-                md_lines.append(f"⭐ **最新版本**（{date}）\n")
-            elif version_info['is_superseded']:
-                md_lines.append(f"⚠️ **此版本已過時** - 請參考最新版本\n")
-
-        # Metadata 區塊
+        # ===== 基本資訊區塊 =====
         md_lines.append("## 📋 基本資訊\n")
 
-        # ID
+        # 文件編號
         if 'id' in item:
             md_lines.append(f"- **文件編號**: `{item['id']}`")
 
-        # 日期
+        # 發文字號
+        doc_number = metadata.get('doc_number')
+        if doc_number:
+            md_lines.append(f"- **發文字號**: {doc_number}")
+
+        # 發布日期
         if 'date' in item:
             md_lines.append(f"- **發布日期**: {item['date']}")
 
@@ -79,23 +83,10 @@ class MarkdownFormatter:
             md_lines.append(f"- **來源單位**: {source_raw}")
 
         # 標準化來源
-        if 'metadata' in item and 'source' in item['metadata']:
-            source = item['metadata']['source']
+        source = metadata.get('source')
+        if source:
             source_name = self.source_names.get(source, source)
             md_lines.append(f"- **單位代碼**: {source_name}")
-
-        # 公告類型
-        if 'metadata' in item and 'category' in item['metadata']:
-            category = item['metadata']['category']
-            if category:
-                category_name = self.category_names.get(category, category)
-                md_lines.append(f"- **公告類型**: {category_name}")
-
-        # 公告文號
-        if 'metadata' in item and 'announcement_number' in item['metadata']:
-            ann_number = item['metadata']['announcement_number']
-            if ann_number:
-                md_lines.append(f"- **公告文號**: {ann_number}")
 
         # 原始連結
         if 'detail_url' in item:
@@ -103,53 +94,98 @@ class MarkdownFormatter:
 
         md_lines.append("")  # 空行
 
-        # 內容區塊
+        # ===== 被處分人資訊 =====
+        penalized_entity = metadata.get('penalized_entity', {})
+        if penalized_entity and penalized_entity.get('name'):
+            md_lines.append("## 👤 被處分對象\n")
+
+            name = penalized_entity.get('name')
+            if name:
+                md_lines.append(f"- **名稱**: {name}")
+
+            entity_type = penalized_entity.get('type')
+            if entity_type:
+                type_name = self.entity_type_names.get(entity_type, entity_type)
+                md_lines.append(f"- **業別**: {type_name}")
+
+            tax_id = penalized_entity.get('tax_id')
+            if tax_id:
+                md_lines.append(f"- **統一編號**: {tax_id}")
+
+            md_lines.append("")  # 空行
+
+        # ===== 處分內容 =====
+        md_lines.append("## ⚖️ 處分內容\n")
+
+        # 處分金額
+        penalty_amount = metadata.get('penalty_amount')
+        penalty_amount_text = metadata.get('penalty_amount_text')
+
+        if penalty_amount or penalty_amount_text:
+            if penalty_amount_text:
+                md_lines.append(f"- **處分金額**: {penalty_amount_text}")
+            elif penalty_amount:
+                # 格式化數字
+                formatted_amount = f"{penalty_amount:,}"
+                md_lines.append(f"- **處分金額**: 新臺幣 {formatted_amount} 元")
+
+        # 違規類型
+        category = metadata.get('category')
+        if category:
+            category_name = self.category_names.get(category, category)
+            md_lines.append(f"- **違規類型**: {category_name}")
+
+        # 檢查報告編號
+        inspection_report = metadata.get('inspection_report')
+        if inspection_report:
+            md_lines.append(f"- **檢查報告編號**: {inspection_report}")
+
+        md_lines.append("")  # 空行
+
+        # ===== 違規事由 =====
+        violation = metadata.get('violation', {})
+        if violation and (violation.get('summary') or violation.get('details')):
+            md_lines.append("## 📝 違規事由\n")
+
+            summary = violation.get('summary')
+            if summary:
+                md_lines.append(f"**摘要**: {summary}\n")
+
+            details = violation.get('details')
+            if details:
+                md_lines.append("**詳細說明**:\n")
+                # 清理詳細內容
+                cleaned_details = self._clean_content(details)
+                md_lines.append(cleaned_details)
+
+            md_lines.append("")  # 空行
+
+        # ===== 法條依據 =====
+        legal_basis = metadata.get('legal_basis', [])
+        if legal_basis:
+            md_lines.append("## 📜 法條依據\n")
+
+            for i, law in enumerate(legal_basis, 1):
+                md_lines.append(f"{i}. {law}")
+
+            md_lines.append("")  # 空行
+
+        # ===== 完整內容 =====
         if 'content' in item:
             content = item['content']
 
             if isinstance(content, dict) and 'text' in content:
                 text = content['text'].strip()
                 if text:
-                    md_lines.append("## 📄 內容\n")
+                    md_lines.append("## 📄 完整內容\n")
                     # 清理內容
                     text = self._clean_content(text)
                     md_lines.append(text)
                     md_lines.append("")
 
-        # 修正歷程區塊（如果有版本資訊）
-        if self.version_tracker:
-            version_info = self.version_tracker.get_version_info(item)
-
-            if version_info['regulation_name'] and version_info['total_versions'] > 1:
-                md_lines.append("## 📜 修正歷程\n")
-
-                history = version_info['version_history']
-                for i, version in enumerate(history):
-                    date = version['date']
-                    is_current = (version['id'] == item.get('id'))
-
-                    if i == 0:  # 最新版本
-                        if is_current:
-                            md_lines.append(f"- **{date}**：最新修正（本文件）⭐")
-                        else:
-                            md_lines.append(f"- **{date}**：最新修正")
-                    else:
-                        if is_current:
-                            md_lines.append(f"- {date}：本次修正（已由最新版本取代）")
-                        else:
-                            md_lines.append(f"- {date}：前次修正")
-
-                md_lines.append("")
-
-                # 加入提示
-                if version_info['is_latest']:
-                    md_lines.append("*本文件為最新有效版本，取代所有先前版本。*\n")
-                elif version_info['is_superseded']:
-                    md_lines.append("*本文件已被新版本取代，建議參考最新版本。*\n")
-
-        # 附件區塊
-        if 'attachments' in item and item['attachments']:
-            attachments = item['attachments']
+        # ===== 附件區塊 =====
+        attachments = item.get('attachments', [])
+        if attachments:
             md_lines.append("## 📎 相關附件\n")
 
             for i, att in enumerate(attachments, 1):
@@ -157,21 +193,36 @@ class MarkdownFormatter:
                 url = att.get('url', '')
                 file_type = att.get('type', 'unknown').upper()
 
-                md_lines.append(f"{i}. **{name}** ([{file_type}]({url}))")
+                # 如果有本地檔案路徑，也顯示
+                local_path = att.get('local_path')
+                if local_path:
+                    md_lines.append(f"{i}. **{name}** ([{file_type}]({url}))")
+                    md_lines.append(f"   - 本地路徑: `{local_path}`")
+                else:
+                    md_lines.append(f"{i}. **{name}** ([{file_type}]({url}))")
 
             md_lines.append("")
 
-        # 分隔線
+        # ===== 分隔線 =====
         md_lines.append("---\n")
 
-        # Metadata footer (方便 RAG 檢索)
+        # ===== Metadata footer (方便 RAG 檢索) =====
         footer_tags = []
+
         if 'date' in item:
             footer_tags.append(f"日期:{item['date']}")
-        if 'metadata' in item and 'source' in item['metadata']:
-            footer_tags.append(f"來源:{item['metadata']['source']}")
-        if 'metadata' in item and 'category' in item['metadata'] and item['metadata']['category']:
-            footer_tags.append(f"類型:{item['metadata']['category']}")
+
+        if source:
+            footer_tags.append(f"來源:{source}")
+
+        if category:
+            footer_tags.append(f"類型:{category}")
+
+        if penalized_entity.get('name'):
+            footer_tags.append(f"被處分人:{penalized_entity['name']}")
+
+        if penalty_amount:
+            footer_tags.append(f"金額:{penalty_amount}")
 
         if footer_tags:
             md_lines.append(f"*標籤: {' | '.join(footer_tags)}*\n")
@@ -180,10 +231,10 @@ class MarkdownFormatter:
 
     def format_batch(self, items: List[Dict[str, Any]], add_toc: bool = True) -> str:
         """
-        格式化多筆公告為單一 Markdown 文件
+        格式化多筆裁罰案件為單一 Markdown 文件
 
         Args:
-            items: 公告資料列表
+            items: 裁罰案件資料列表
             add_toc: 是否新增目錄
 
         Returns:
@@ -192,9 +243,9 @@ class MarkdownFormatter:
         md_parts = []
 
         # 文檔標題
-        md_parts.append("# 金管會重要公告彙編\n")
+        md_parts.append("# 金管會裁罰案件彙編\n")
         md_parts.append(f"**產生時間**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        md_parts.append(f"**文件數量**: {len(items)} 筆\n")
+        md_parts.append(f"**案件數量**: {len(items)} 筆\n")
         md_parts.append("---\n")
 
         # 目錄 (可選)
@@ -215,10 +266,10 @@ class MarkdownFormatter:
             logger.debug(f"格式化第 {i}/{len(items)} 筆: {item.get('title', 'N/A')[:50]}")
 
             # 新增序號標記
-            md_parts.append(f"\n<!-- 文件 {i}/{len(items)} -->\n")
+            md_parts.append(f"\n<!-- 案件 {i}/{len(items)} -->\n")
 
             # 格式化單筆
-            md_content = self.format_announcement(item)
+            md_content = self.format_penalty(item)
             md_parts.append(md_content)
 
             # 分頁符號 (除了最後一筆)
@@ -307,15 +358,15 @@ class MarkdownFormatter:
             raise
 
 
-class BatchMarkdownFormatter(MarkdownFormatter):
-    """批次 Markdown 格式化器 - 依日期或來源分檔"""
+class BatchPenaltyMarkdownFormatter(PenaltyMarkdownFormatter):
+    """批次裁罰案件 Markdown 格式化器 - 依日期、來源或違規類型分檔"""
 
     def format_by_date(self, items: List[Dict[str, Any]]) -> Dict[str, str]:
         """
         按日期分組並格式化
 
         Args:
-            items: 公告資料列表
+            items: 裁罰案件資料列表
 
         Returns:
             {date: markdown_content} 字典
@@ -341,7 +392,7 @@ class BatchMarkdownFormatter(MarkdownFormatter):
         按來源單位分組並格式化
 
         Args:
-            items: 公告資料列表
+            items: 裁罰案件資料列表
 
         Returns:
             {source: markdown_content} 字典
@@ -365,18 +416,47 @@ class BatchMarkdownFormatter(MarkdownFormatter):
         logger.info(f"按來源分組完成: {len(results)} 個檔案")
         return results
 
+    def format_by_category(self, items: List[Dict[str, Any]]) -> Dict[str, str]:
+        """
+        按違規類型分組並格式化
+
+        Args:
+            items: 裁罰案件資料列表
+
+        Returns:
+            {category: markdown_content} 字典
+        """
+        from collections import defaultdict
+
+        grouped = defaultdict(list)
+
+        for item in items:
+            category = 'unknown'
+            if 'metadata' in item and 'category' in item['metadata']:
+                category = item['metadata']['category']
+
+            grouped[category].append(item)
+
+        results = {}
+        for category, group_items in grouped.items():
+            md = self.format_batch(group_items, add_toc=True)
+            results[category] = md
+
+        logger.info(f"按違規類型分組完成: {len(results)} 個檔案")
+        return results
+
     def format_individual_files(
         self,
-        data_type: str,
+        items: List[Dict[str, Any]],
         output_dir: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        將每篇公告格式化為獨立的 Markdown 檔案
-        (推薦用於 RAG 上傳,每篇公告都有獨立且語意化的檔名)
+        將每個裁罰案件格式化為獨立的 Markdown 檔案
+        (推薦用於 RAG 上傳,每個案件都有獨立且語意化的檔名)
 
         Args:
-            data_type: 資料類型 (announcements, laws, penalties)
-            output_dir: 輸出目錄 (預設: data/markdown/individual)
+            items: 裁罰案件資料列表
+            output_dir: 輸出目錄 (預設: data/markdown/penalties_individual)
 
         Returns:
             統計資訊 {'total_items': ..., 'created_files': ..., 'output_dir': ...}
@@ -386,19 +466,16 @@ class BatchMarkdownFormatter(MarkdownFormatter):
 
         # 預設輸出目錄
         if not output_dir:
-            output_dir = f'data/markdown/individual'
+            output_dir = 'data/markdown/penalties_individual'
 
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"開始格式化 {data_type} 為獨立檔案...")
+        logger.info(f"開始格式化裁罰案件為獨立檔案...")
         logger.info(f"輸出目錄: {output_path}")
 
-        # 讀取資料
-        items = self.handler.read_all(data_type)
-
         if not items:
-            logger.warning(f"沒有找到 {data_type} 資料")
+            logger.warning("沒有裁罰案件資料")
             return {'total_items': 0, 'created_files': 0, 'output_dir': str(output_path)}
 
         # 來源中文映射
@@ -406,7 +483,8 @@ class BatchMarkdownFormatter(MarkdownFormatter):
             'bank_bureau': '銀行局',
             'securities_bureau': '證券期貨局',
             'insurance_bureau': '保險局',
-            'inspection_bureau': '檢查局',
+            'examination_bureau': '檢查局',
+            'fsc_main': '金管會',
             'unknown': '未分類'
         }
 
@@ -421,13 +499,13 @@ class BatchMarkdownFormatter(MarkdownFormatter):
                 text = text[:max_length]
             return text
 
-        # 為每篇公告建立獨立檔案
+        # 為每個案件建立獨立檔案
         created_files = []
 
         for item in items:
             try:
-                # 格式化單篇公告
-                md_content = self.format_announcement(item)
+                # 格式化單個案件
+                md_content = self.format_penalty(item)
 
                 # 建立語意化的檔名
                 item_id = item.get('id', 'unknown')

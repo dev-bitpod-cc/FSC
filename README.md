@@ -4,15 +4,28 @@
 
 ## 📋 專案狀態
 
-- ✅ 專案架構建立完成
-- ✅ 核心模組實作完成 (BaseCrawler, JSONL Storage, Index Manager)
-- ✅ 重要公告爬蟲實作完成 (支援 POST 分頁)
-- ✅ **附件自動下載功能完成**（支援 PDF/DOC/DOCX，包含修正條文對照表）
-- ✅ Markdown 格式化器完成（支援獨立檔案格式）
-- ✅ Gemini 上傳器完成（重試、驗證、斷點續傳、附件上傳）
+### ✅ 公告系統
+- ✅ 公告爬蟲實作完成 (支援 POST 分頁)
+- ✅ 附件自動下載功能（支援 PDF/DOC/DOCX，包含修正條文對照表）
+- ✅ Markdown 格式化器（支援獨立檔案格式）
+- ✅ **時效性標註機制**（自動識別最新版本與過時版本）
+- ✅ Gemini 上傳器（重試、驗證、斷點續傳、附件上傳）
 - ✅ 增量更新支援（自動去重）
-- ✅ 測試成功 (150 筆公告資料上傳到 Gemini)
-- ✅ 準備就緒，可進行生產部署（含附件）
+
+### ✅ 裁罰案件系統
+- ✅ 裁罰案件爬蟲實作完成
+- ✅ Metadata 結構化提取（處分金額、法條依據、違規類型等）
+- ✅ 附件下載支援
+- ✅ Markdown 格式化器（支援獨立檔案、分組格式化）
+- ✅ 測試驗證完成
+
+### ✅ 多 Store 查詢架構
+- ✅ 獨立 Store 設計（公告/裁罰分離）
+- ✅ 時效性處理機制（Markdown 標註 + System Instruction）
+- ✅ 查詢範圍控制（支援單一或多 Store 查詢）
+- ✅ 完整架構文檔
+
+**準備就緒，可進行生產部署！**
 
 ## 🚀 快速開始
 
@@ -56,15 +69,24 @@ cp .env.example .env
 ### 測試爬蟲
 
 ```bash
-# 測試爬取 3 頁 (45 筆公告)
+# 測試公告爬蟲 (爬取 3 頁，45 筆公告)
 python scripts/test_crawler.py
+
+# 測試裁罰案件爬蟲 (爬取 2 筆案件)
+python scripts/test_penalty_crawler.py
 ```
 
 ### 測試 Markdown 格式化
 
 ```bash
-# 將 JSONL 轉換為 Markdown
+# 公告 Markdown 格式化
 python scripts/test_markdown_formatter.py
+
+# 裁罰案件 Markdown 格式化
+python scripts/test_penalty_markdown_formatter.py
+
+# 測試時效性標註功能
+python scripts/test_temporal_annotation.py
 ```
 
 ### 生產環境部署 (需要 API Key)
