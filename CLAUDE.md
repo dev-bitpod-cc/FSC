@@ -8,26 +8,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **專案使用繁體中文**,所有文檔、註解、變數命名請遵循此慣例。
 
-## 最新更新 (2025-11-13)
+## 最新更新 (2025-11-14)
 
-### ✅ 裁罰案件系統完成
-- 實作裁罰案件爬蟲 (`src/crawlers/penalties.py`)
-- 實作裁罰 Markdown 格式化器 (`src/processor/penalty_markdown_formatter.py`)
-- 完成測試腳本與驗證
+### 🔧 裁罰爬蟲附件處理修正
+**問題發現**：494/495 筆裁罰案件誤抓了網頁側邊欄/頁尾的通用附件
+- 失智者經濟安全保障推動計畫 (365 KB)
+- 金管會永續發展目標自願檢視報告 (2.99 MB)
 
-### ✅ 時效性標註機制完成
-- 實作版本追蹤器 (`src/processor/version_tracker.py`)
-- 修改公告格式化器，加入時效性標註
-- 自動識別最新版本與過時版本
-- 顯示修正歷程
+**根本原因**：爬蟲從整個頁面抓取所有 `<a>` 標籤，包含非內容區域的連結
 
-### ✅ 多 Store 查詢架構設計完成
-- 完整架構文檔 (`docs/multi_store_query_architecture.md`)
-- 支援獨立或同時查詢公告/裁罰
-- 時效性處理機制
-- 參考文件數量控制方案
+**已修正**：
+- `src/crawlers/penalties.py` - 只從內容區域 (`div.zbox`) 抓取附件，並新增關鍵字過濾
+- `src/processor/penalty_markdown_formatter.py` - 生成 Markdown 時過濾不相關附件
 
-詳見 `docs/implementation_summary.md` 了解完整實作狀態。
+**驗證工具**：`scripts/verify_penalty_html_structure.py` - 可驗證 HTML 選擇器正確性
+
+**影響**：已上傳的 493 筆包含誤抓附件，建議在新環境重新爬取並上傳
+
+### ✅ Gemini File Search Store 上傳完成
+- Store ID: `fileSearchStores/fscpenalties-ma1326u8ck77`
+- 上傳狀態: 493/495 成功 (99.6%)
+- 失敗案件: 2 筆（Gemini API 503 錯誤，移除附件後仍失敗）
+
+### ✅ 前端部署完成 (2025-11-13)
+- 專案: `FSC-Penalties-Deploy` (Streamlit)
+- 功能: RAG 查詢、模型選擇、來源篩選、檔名簡化
+
+詳見 `HANDOFF.md` 了解當前狀態和交接資訊。
 
 ## 環境設定
 

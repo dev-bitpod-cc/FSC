@@ -187,9 +187,34 @@ class PenaltyCrawler(BaseFSCCrawler):
 
             # 提取附件
             attachments = []
-            for link in soup.select('a'):
+
+            # 過濾掉不相關的通用附件（金管會網頁側邊欄/頁尾的通用連結）
+            irrelevant_attachment_keywords = [
+                '失智者經濟安全保障推動計畫',
+                '金管會永續發展目標自願檢視報告',
+                '永續發展目標',
+                '經濟安全保障'
+            ]
+
+            # 只從內容區域抓取附件（避免抓到側邊欄/頁尾的連結）
+            attachment_links = []
+            if content_div:
+                attachment_links = content_div.select('a')
+            else:
+                # 如果沒有找到內容區域，仍然從整個頁面抓取，但會過濾
+                attachment_links = soup.select('a')
+
+            for link in attachment_links:
                 href = link.get('href', '')
+                link_text = clean_text(link.get_text())
+
+                # 檢查是否為文件連結
                 if any(ext in href.lower() for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.odt']):
+                    # 過濾掉不相關的附件
+                    if any(keyword in link_text for keyword in irrelevant_attachment_keywords):
+                        logger.debug(f"過濾掉不相關附件: {link_text}")
+                        continue
+
                     # 提取檔案類型（處理 URL 參數如 .pdf&flag=doc）
                     file_type = 'unknown'
                     if '.' in href:
@@ -204,7 +229,7 @@ class PenaltyCrawler(BaseFSCCrawler):
                             file_type = ext_part
 
                     attachments.append({
-                        'name': clean_text(link.get_text()),
+                        'name': link_text,
                         'url': urljoin(self.base_url, href),
                         'type': file_type
                     })

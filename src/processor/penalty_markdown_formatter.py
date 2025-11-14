@@ -185,10 +185,23 @@ class PenaltyMarkdownFormatter:
 
         # ===== 附件區塊 =====
         attachments = item.get('attachments', [])
-        if attachments:
+
+        # 過濾掉不相關的通用附件（爬蟲誤抓）
+        irrelevant_attachments = [
+            '失智者經濟安全保障推動計畫',
+            '金管會永續發展目標自願檢視報告'
+        ]
+
+        # 只保留相關附件
+        relevant_attachments = [
+            att for att in attachments
+            if att.get('name', '') not in irrelevant_attachments
+        ]
+
+        if relevant_attachments:
             md_lines.append("## 📎 相關附件\n")
 
-            for i, att in enumerate(attachments, 1):
+            for i, att in enumerate(relevant_attachments, 1):
                 name = att.get('name', '未命名')
                 url = att.get('url', '')
                 file_type = att.get('type', 'unknown').upper()
