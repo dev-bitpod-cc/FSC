@@ -26,6 +26,56 @@ from src.storage.jsonl_handler import JSONLHandler
 from src.utils.law_link_generator import generate_law_urls_from_list
 
 
+def clean_content_text(text: str) -> str:
+    """
+    清理內容文字，移除網頁雜訊
+
+    移除的雜訊包括：
+    - 社群分享按鈕（FACEBOOK、Line、Twitter）
+    - 導航元素（友善列印、回上頁）
+    - 頁面標題重複（裁罰案件）
+
+    Args:
+        text: 原始內容文字
+
+    Returns:
+        清理後的文字
+    """
+    if not text:
+        return ''
+
+    # 移除開頭的雜訊行
+    noise_patterns = [
+        '裁罰案件',
+        '_',
+        'FACEBOOK',
+        'Line',
+        'Twitter',
+        '友善列印',
+        '回上頁',
+    ]
+
+    lines = text.split('\n')
+    cleaned_lines = []
+
+    # 跳過開頭的雜訊行
+    skip_lines = 0
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+
+        # 如果是雜訊行，標記跳過
+        if line_stripped in noise_patterns:
+            skip_lines = i + 1
+        # 如果已經看到非雜訊的實質內容，停止跳過
+        elif line_stripped and len(line_stripped) > 10:
+            break
+
+    # 從第一個非雜訊行開始保留
+    cleaned_lines = lines[skip_lines:]
+
+    return '\n'.join(cleaned_lines).strip()
+
+
 def extract_applicable_laws(content_text: str) -> List[str]:
     """
     從內容中提取適用法條（僅提取核心違規法規）
@@ -282,8 +332,11 @@ def generate_file_mapping(source: str = 'penalties') -> Dict[str, Any]:
 
         # 提取內容
         content = item.get('content', {})
-        content_text = content.get('text', '')
+        content_text_raw = content.get('text', '')
         content_html = content.get('html', '')
+
+        # 清理內容文字（移除網頁雜訊）
+        content_text = clean_content_text(content_text_raw)
 
         # 提取適用法條
         applicable_laws = extract_applicable_laws(content_text)
