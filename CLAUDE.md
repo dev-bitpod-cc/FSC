@@ -21,18 +21,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `src/crawlers/penalties.py` - 只從內容區域 (`div.zbox`) 抓取附件，並新增關鍵字過濾
 - `src/processor/penalty_markdown_formatter.py` - 生成 Markdown 時過濾不相關附件
 
-**驗證工具**：`scripts/verify_penalty_html_structure.py` - 可驗證 HTML 選擇器正確性
+**驗證結果**：✅ 重新爬取 495 筆，100% 無誤抓附件（0/495）
 
-**影響**：已上傳的 493 筆包含誤抓附件，建議在新環境重新爬取並上傳
+### 📊 法規提取邏輯優化
+**問題發現**：映射檔中法規欄位包含大量重複和程序性法規
+- 平均每案 6.8 條法規（實際核心違規僅 1-3 條）
+- 包含訴願法、行政執行法（程序性，非違規）
+- 同一法條重複（不同前綴詞）
 
-### ✅ Gemini File Search Store 上傳完成
-- Store ID: `fileSearchStores/fscpenalties-ma1326u8ck77`
-- 上傳狀態: 493/495 成功 (99.6%)
-- 失敗案件: 2 筆（Gemini API 503 錯誤，移除附件後仍失敗）
+**已優化**（`scripts/generate_file_mapping.py`）：
+- 過濾程序性法規（訴願法、行政執行法）
+- 只提取核心違規法條（有「違反」關鍵字）
+- 移除前綴詞（依、核、爰依等）並自動去重
 
-### ✅ 前端部署完成 (2025-11-13)
+**優化結果**：
+- 平均法規數：6.8 → 1.4 條（↓79%）
+- 中位數：7 → 1 條
+- 57% 案例只有 1 條法規
+
+### ✅ Gemini File Search Store（乾淨資料）
+- 新 Store ID: `fileSearchStores/fscpenalties-tu709bvr1qti`
+- 狀態: 上傳中（預計 492/495 成功）
+- 資料品質: 100% 乾淨（無誤抓附件）
+- 舊 Store: 已刪除
+
+### ✅ 前端整合完成 (2025-11-14)
 - 專案: `FSC-Penalties-Deploy` (Streamlit)
-- 功能: RAG 查詢、模型選擇、來源篩選、檔名簡化
+- 功能: RAG 查詢、模型選擇、來源篩選、映射檔整合
+- 映射檔: 已同步（5.43 MB，495 筆）
+- 顯示格式: 日期_來源_機構（如：2025-07-31_保險局_三商美邦人壽）
 
 詳見 `HANDOFF.md` 了解當前狀態和交接資訊。
 
