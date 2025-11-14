@@ -123,11 +123,20 @@ def extract_applicable_laws(content_text: str) -> List[str]:
             if law_name in PROCEDURAL_LAWS:
                 continue
 
-            # 移除法名中的前綴詞
-            law_name = re.sub(r'^(依|核|核已|核有|已|有|與|分別為|應依|爰依|按|惟|同)', '', law_name)
+            # 過濾掉以無效前綴開頭的法名（這些通常是誤匹配）
+            # 例如：「與保險法」（原文是「核與保險法...不符」，「與」是動詞）
+            if law_name.startswith(('與', '同', '及', '或', '和')):
+                continue
 
-            # 過濾掉無效法名（如「同法」、「本法」）
-            if law_name in ['法', '同法', '本法']:
+            # 移除法名中的前綴詞
+            law_name = re.sub(r'^(依|核|核已|核有|已|有|分別為|應依|爰依|按|惟|並依同)', '', law_name)
+
+            # 過濾掉無效法名（如「法」、「同法」、「本法」）
+            if law_name in ['法', '同法', '本法'] or len(law_name) < 3:
+                continue
+
+            # 過濾掉仍包含「同法」的法條（避免「並依同法第XX條」被提取為「同法第XX條」）
+            if '同法' in law_name:
                 continue
 
             # 重建法條文字（純淨格式）
@@ -158,11 +167,19 @@ def extract_applicable_laws(content_text: str) -> List[str]:
                 if law_name in PROCEDURAL_LAWS:
                     continue
 
-                # 移除法名中的前綴詞
-                law_name = re.sub(r'^(依|核|核已|核有|已|有|與|分別為|應依|爰依|按|惟|同)', '', law_name)
+                # 過濾掉以無效前綴開頭的法名（這些通常是誤匹配）
+                if law_name.startswith(('與', '同', '及', '或', '和')):
+                    continue
 
-                # 過濾掉無效法名（如「同法」、「本法」）
-                if law_name in ['法', '同法', '本法']:
+                # 移除法名中的前綴詞
+                law_name = re.sub(r'^(依|核|核已|核有|已|有|分別為|應依|爰依|按|惟|並依同)', '', law_name)
+
+                # 過濾掉無效法名（如「法」、「同法」、「本法」）
+                if law_name in ['法', '同法', '本法'] or len(law_name) < 3:
+                    continue
+
+                # 過濾掉仍包含「同法」的法條
+                if '同法' in law_name:
                     continue
 
                 # 重建法條文字（純淨格式）
@@ -203,7 +220,7 @@ def extract_institution_from_title(title: str) -> str:
     separators = [
         '因', '辦理', '經營', '涉及', '所涉', '客服', '催收',
         '未依', '未於', '未經', '未能', '違反', '核有', '經',
-        '於民國', '從事', '受託', '自', '前於'
+        '於民國', '從事', '受託', '自', '前於', '對於'
     ]
 
     # 找到第一個分隔詞的位置
@@ -218,24 +235,42 @@ def extract_institution_from_title(title: str) -> str:
     if min_pos < len(title):
         institution = title[:min_pos]
     else:
-        # 如果找不到分隔詞，取前50個字
-        institution = title[:50]
+        # 如果找不到分隔詞，嘗試找到第一個中文句號或逗號
+        for punct in ['，', '。', '、']:
+            pos = title.find(punct)
+            if pos > 0:
+                institution = title[:pos]
+                break
+        else:
+            # 仍找不到，取前30個字（降低長度避免抓到太多內容）
+            institution = title[:30]
 
-    # 簡化機構名稱（移除常見後綴）
+    # 簡化機構名稱（按順序處理，避免過度簡化）
     simplifications = [
+        # 先處理完整後綴
+        ('保險股份有限公司', ''),
+        ('人壽保險股份有限公司', '人壽'),
+        ('產物保險股份有限公司', '產險'),
         ('股份有限公司', ''),
         ('有限公司', ''),
+        # 再處理銀行類
         ('商業銀行', '銀行'),
-        ('產物保險', '產險'),
-        ('人壽保險', '人壽'),
+        # 證券類
         ('證券投資信託', '投信'),
         ('證券投資顧問', '投顧'),
         ('證券金融', '證金'),
+        # 其他
         ('期貨', '期貨'),
     ]
 
     for old, new in simplifications:
-        institution = institution.replace(old, new)
+        if old in institution:
+            institution = institution.replace(old, new)
+            break  # 只替換第一個匹配的，避免過度簡化
+
+    # 移除可能重複的「公司」
+    if institution.endswith('公司'):
+        institution = institution[:-2]
 
     # 清理空白
     institution = institution.strip()
