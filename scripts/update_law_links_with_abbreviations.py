@@ -54,30 +54,26 @@ def generate_law_urls_with_abbreviations(law_texts):
         for law_info in laws:
             current = law_info['parsed']
             url = law_info['url']
+            law_name = current['law_name']
 
-            # 策略: 省略法律名稱，生成兩個版本
-            # 1. 基礎版：第X條 或 第X條之Y
-            # 2. 完整版：包含項/款/目（如果有的話）
+            # 策略: 只生成到「條」或「條之X」層級的連結
+            # 1. 帶法律名稱：保險法第X條、保險法第X條之Y
+            # 2. 省略法律名稱：第X條、第X條之Y
 
-            # 基礎版（只到條）
+            # 基礎條號
             base_parts = [f"第{current.get('article', '')}條"]
             if current.get('sub_article'):
                 base_parts.append(f"之{current['sub_article']}")
-            base_abbr = ''.join(base_parts)
-            if len(base_abbr) >= 3 and base_abbr not in result:
-                result[base_abbr] = url
+            base_article = ''.join(base_parts)
 
-            # 完整版（包含項/款）
-            full_parts = base_parts[:]
-            if current.get('paragraph'):
-                full_parts.append(f"第{current['paragraph']}項")
-            if current.get('subparagraph'):
-                full_parts.append(f"第{current['subparagraph']}款")
+            # 帶法律名稱的基礎版本（用於匹配「保險法第149條」）
+            full_base = f"{law_name}{base_article}"
+            if full_base not in result:
+                result[full_base] = url
 
-            full_abbr = ''.join(full_parts)
-            # 只有當完整版不同於基礎版時才加入
-            if full_abbr != base_abbr and full_abbr not in result:
-                result[full_abbr] = url
+            # 簡寫版本（用於匹配「第171條之1」）
+            if len(base_article) >= 3 and base_article not in result:
+                result[base_article] = url
 
     return result
 
