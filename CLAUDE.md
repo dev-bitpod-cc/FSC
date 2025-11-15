@@ -37,9 +37,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 
 **部署狀態**：
-- FSC 主專案：commit `46fe373`
-- FSC-Penalties-Deploy：commit `7161040`
-- Streamlit Cloud：自動部署中
+- FSC 主專案：commit `3a1ab66` (2025-11-15)
+- FSC-Penalties-Deploy：commit `3b4a0c6` (2025-11-15)
+- Streamlit Cloud：已自動部署 ✅
+
+**關鍵修復**（2025-11-15）：
+- 修正 `update_law_links_with_abbreviations.py` 排序錯誤（article 字串→int）
+- 修正 `generate_file_mapping.py` 法條提取邏輯（移除 Strategy 2 限制）
+- 新增「目」層級支援（第X款第Y目）
+- 更新 461 筆資料的 law_links，生成條層級連結
+- 問題案例「保險法第143條之6」現已正確生成連結 ✅
 
 ---
 
