@@ -8,7 +8,49 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **專案使用繁體中文**,所有文檔、註解、變數命名請遵循此慣例。
 
-## 最新更新 (2025-11-15)
+## 最新更新 (2025-11-16)
+
+### 🔧 證券投資信託及顧問法 pcode 修正與快取優化
+
+**問題發現**：證券投資信託及顧問法的法條連結導向無效頁面
+- 錯誤 URL：`https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=G0400129&flno=77`
+- 網頁顯示：「參數資料有誤，請重新操作或洽系統管理人員」
+- 根本原因：pcode 映射錯誤
+  - G0400129：證券交易法第一百五十七條之一第五項及第六項重大消息範圍及其公開方式管理辦法
+  - G0400121：證券投資信託及顧問法（正確）
+
+**已修正**（FSC 主專案）：
+1. `src/utils/law_link_generator.py:25` - 修正 pcode 映射
+   ```python
+   # BEFORE: '證券投資信託及顧問法': 'G0400129'
+   # AFTER:  '證券投資信託及顧問法': 'G0400121'
+   ```
+2. 重新生成 file_mapping.json（22 筆案例更新，151 個連結修正）
+3. commit `b9849e4`
+
+**已修正**（FSC-Penalties-Deploy 部署專案）：
+1. 同步更新 `data/penalties/file_mapping.json`（commit `7301e1b`）
+2. **關鍵修正**：移除 Streamlit 快取機制（commit `d9a1ba5`）
+   - 問題：`@st.cache_data` 快取了舊的 file_mapping.json
+   - 即使檔案已更新，前端仍使用快取中的錯誤 pcode
+   - 解決：移除 `load_file_mapping()` 和 `load_gemini_id_mapping()` 的快取裝飾器
+   - 效果：確保每次查詢都使用最新的法條連結
+
+**驗證結果**：
+- ✅ 所有 75 個證券投資信託及顧問法相關連結已修正
+- ✅ 測試案例確認：
+  - 丹尼爾證券投資顧問 (fsc_pen_20220329_0068)
+  - 禮正證券投資顧問 (fsc_pen_20190725_0209)
+- ✅ 正確 URL：`https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=G0400121&flno=77`
+
+**部署狀態**：
+- FSC 主專案：commit `b9849e4` ✅
+- FSC-Penalties-Deploy：commits `7301e1b`, `d9a1ba5`, `e768d7b` ✅
+- Streamlit Cloud：已自動部署 ✅
+
+---
+
+## 歷史更新 (2025-11-15)
 
 ### 🎨 前端 UI 優化與 Hallucination 防護 (2025-11-15 晚間)
 
