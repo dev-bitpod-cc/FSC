@@ -13,15 +13,14 @@ from src.utils.law_link_generator import generate_law_url, parse_law_article
 
 
 def generate_law_urls_with_abbreviations(law_texts):
-    """生成包含簡寫版本的法條連結"""
+    """生成只到條層級的法條連結"""
     result = {}
 
-    # 先生成所有完整版本的連結
+    # 解析所有法條（但不直接加入 result）
     law_info_list = []
     for law_text in law_texts:
         url = generate_law_url(law_text)
         if url:
-            result[law_text] = url
             parsed = parse_law_article(law_text)
             if parsed:
                 law_info_list.append({
