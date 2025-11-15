@@ -39,9 +39,6 @@ def generate_law_urls_with_abbreviations(law_texts):
 
     # 為每組生成簡寫版本
     for law_name, laws in law_groups.items():
-        if len(laws) < 2:
-            continue
-
         # 按條文順序排序
         laws.sort(key=lambda x: (
             int(x['parsed'].get('article', 0)),
