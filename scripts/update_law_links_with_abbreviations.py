@@ -44,9 +44,9 @@ def generate_law_urls_with_abbreviations(law_texts):
 
         # 按條文順序排序
         laws.sort(key=lambda x: (
-            x['parsed'].get('article', 0),
+            int(x['parsed'].get('article', 0)),
             x['parsed'].get('sub_article', '') or '',
-            x['parsed'].get('paragraph', 0) or 0
+            int(x['parsed'].get('paragraph') or 0)
         ))
 
         # 為所有法律生成簡寫
