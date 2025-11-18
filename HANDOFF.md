@@ -451,17 +451,25 @@ python scripts/upload_optimized_to_gemini.py \
 
 ---
 
-**最後更新**: 2025-11-18 18:30
+**最後更新**: 2025-11-19 01:20
 **當前狀態**:
 - ✅ 已爬取完整資料（630 筆）
 - ✅ 已篩選 2012+ 資料（490 筆）
-- ✅ 已生成優化 Plain Text（490 筆）
+- ✅ 已生成優化 Plain Text（490 筆，3.2 MB）
 - ✅ 已清理測試 Stores（保留 2 個 Deploy 用）
 - ✅ 已清除 upload manifest
-- ⏳ **準備在新電腦重新上傳**
+- 🚀 **正在上傳 Plain Text 到 Gemini**
+
+**上傳資訊**:
+- Store ID: `fileSearchStores/fscpenaltiesplaintext-4f87t5uexgui`
+- Store 名稱: `fsc-penalties-plaintext`
+- 上傳策略: 4.0 秒延遲（保守設定）
+- 進程 PID: 13644
+- 日誌檔案: `logs/upload_20251119_011954.log`
+- 預估完成時間: 約 1.5 小時（2025-11-19 02:50）
 
 **下次繼續**:
-1. 清除 `data/temp_uploads/upload_manifest.json`（已完成）
-2. 上傳全部 490 個 Plain Text 檔案
-3. 驗證上傳完整性（確保 490/490）
-4. 測試查詢效果並與 Sanction 比較
+1. ⏳ 等待上傳完成（490 個 Plain Text 檔案）
+2. ⏳ 驗證上傳完整性（確保 490/490）
+3. ⏳ 測試查詢效果並與 Sanction 比較
+4. ⏳ 更新前端專案配置（新 Store ID）

@@ -8,7 +8,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **專案使用繁體中文**,所有文檔、註解、變數命名請遵循此慣例。
 
-## 最新更新 (2025-11-16)
+## 最新更新 (2025-11-19)
+
+### 🚀 RAG 優化：Plain Text 生成與上傳
+
+**背景**：為提升 Gemini File Search 查詢效果，採用優化的 Plain Text 格式替代 Markdown
+
+**已完成**：
+1. **Plain Text 生成**（490 筆，2012+）
+   - 腳本：`scripts/generate_filtered_plaintext.py`
+   - 優化器：`src/processor/penalty_plaintext_optimizer.py`
+   - 輸出：`data/plaintext_optimized/penalties_individual/`（3.2 MB）
+   - 優化策略：移除噪音、提高語義密度（預期 +40-60% 檢索準確度）
+
+2. **Gemini Store 建立與上傳**（進行中）
+   - Store ID: `fileSearchStores/fscpenaltiesplaintext-4f87t5uexgui`
+   - Store 名稱: `fsc-penalties-plaintext`
+   - 上傳策略：4.0 秒延遲（保守設定，確保穩定）
+   - 預估完成時間：約 1.5 小時
+   - 日誌：`logs/upload_20251119_011954.log`
+
+**優化原則** (`penalty_plaintext_optimizer.py`):
+- 移除網頁雜訊（Facebook、Line、友善列印等）
+- 移除檢索無用的 metadata（編號、URL、抓取時間）
+- 保留檢索相關欄位（日期、來源、機構、罰款、發文字號）
+- 清理後完整內容（裁處書全文）
+- 預期效果：檔案 -35%、語義密度 +20%、準確度 +40-60%
+
+**下一步**：
+- ⏳ 等待上傳完成（490/490）
+- ⏳ 驗證上傳完整性
+- ⏳ 測試查詢效果並與 Sanction 專案比較
+
+---
+
+## 歷史更新 (2025-11-16)
 
 ### 🔧 證券投資信託及顧問法 pcode 修正與快取優化
 
