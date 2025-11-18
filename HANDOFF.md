@@ -378,7 +378,17 @@ python scripts/upload_optimized_to_gemini.py \
 
 ### 待完成工作
 
-1. **在新電腦重新上傳**（490 筆 Plain Text）
+1. **刪除中斷的 Store**（換電腦前已中斷）
+   ```bash
+   # 中斷的 Store（只有 14/490 個檔案）
+   # Store ID: fileSearchStores/fscpenaltiesplaintext-89kfbite755k
+
+   python scripts/delete_stores_rest_api.py
+   # 或使用 REST API 直接刪除：
+   # DELETE https://generativelanguage.googleapis.com/v1beta/fileSearchStores/fscpenaltiesplaintext-89kfbite755k?force=true
+   ```
+
+2. **在新電腦重新上傳**（490 筆 Plain Text）
    ```bash
    # 1. 確保環境設定
    source venv/bin/activate
@@ -396,14 +406,14 @@ python scripts/upload_optimized_to_gemini.py \
    # 預期成功率：99%+（參考之前 493/495 = 99.6%）
    ```
 
-2. **驗證上傳完整性**
+3. **驗證上傳完整性**
    ```bash
    python scripts/verify_gemini_upload.py \
      --store-id <new-store-id> \
      --local-dir data/plaintext_optimized/penalties_individual
    ```
 
-3. **查詢效果測試**
+4. **查詢效果測試**
    - 與 Sanction 專案比較查詢品質
    - 測試複雜查詢（多條件、時間範圍等）
    - 確認是否達到優化目標

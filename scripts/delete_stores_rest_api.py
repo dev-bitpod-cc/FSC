@@ -53,16 +53,20 @@ def main():
     # 保留: fileSearchStores/fscpenalties-tu709bvr1qti (FSC-Penalties-Deploy)
     # 保留: fileSearchStores/fscpenaltycases1762854180-9kooa996ag5a (Sanction)
 
+    # 2025-11-18: 換電腦前中斷的 Store（只有 14/490 個檔案）
     stores_to_delete = [
-        ("Store #1", "fileSearchStores/fscpenaltycases1762852550-df677oxvk9ke"),
-        ("Store #2", "fileSearchStores/fscpenaltycases1762853298-pp7xw875g3te"),
-        ("Store #3", "fileSearchStores/teststore-n2haofckqioh"),
-        ("Store #4", "fileSearchStores/fscpenaltycases1762853753-f1kefbyo3sqo"),
-        ("Store #5", "fileSearchStores/fscpenaltycases1762854027-y7a8l1qc6elv"),
-        ("Store #8", "fileSearchStores/fscpenaltiesoptimizedtest-ixrg0l5s4967"),
-        ("Store #9", "fileSearchStores/fscpenaltiesoptimized-amgl070m85d5"),
-        ("Store #10", "fileSearchStores/fscpenaltiesfsc490-eg8q35dtsquz"),
+        ("中斷的上傳 (14/490)", "fileSearchStores/fscpenaltiesplaintext-89kfbite755k"),
     ]
+
+    # 已刪除的測試 Stores (2025-11-18)
+    # ("Store #1", "fileSearchStores/fscpenaltycases1762852550-df677oxvk9ke"),
+    # ("Store #2", "fileSearchStores/fscpenaltycases1762853298-pp7xw875g3te"),
+    # ("Store #3", "fileSearchStores/teststore-n2haofckqioh"),
+    # ("Store #4", "fileSearchStores/fscpenaltycases1762853753-f1kefbyo3sqo"),
+    # ("Store #5", "fileSearchStores/fscpenaltycases1762854027-y7a8l1qc6elv"),
+    # ("Store #8", "fileSearchStores/fscpenaltiesoptimizedtest-ixrg0l5s4967"),
+    # ("Store #9", "fileSearchStores/fscpenaltiesoptimized-amgl070m85d5"),
+    # ("Store #10", "fileSearchStores/fscpenaltiesfsc490-eg8q35dtsquz")
 
     print("🗑️  使用 REST API 強制刪除 Stores (force=true)")
     print("=" * 80)
