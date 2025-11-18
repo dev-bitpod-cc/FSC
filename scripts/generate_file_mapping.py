@@ -654,21 +654,53 @@ def generate_file_mapping(source: str = 'penalties', use_llm: bool = False, api_
         title = item.get('title', '')
         institution_name = extract_institution_from_title(title)
 
+        # 提取 metadata
+        metadata_dict = item.get('metadata', {})
+
+        # 提取處分金額資訊
+        penalty_amount = metadata_dict.get('penalty_amount')
+        penalty_amount_text = metadata_dict.get('penalty_amount_text', '')
+
         # 建立映射
         mapping[file_id] = {
+            # === Gemini File 資訊 (上傳後填入) ===
+            'gemini_id': '',  # 上傳後由 uploader 填入
+            'gemini_uri': '',  # 上傳後由 uploader 填入
+
+            # === 顯示用基本資訊 ===
             'display_name': generate_display_name(item),
-            'original_url': detail_url,
+            'title': title,
             'date': item.get('date', ''),
-            'title': title,  # 新增：完整標題
-            'institution': institution_name,  # 修正：使用提取的機構名稱
-            'source': item.get('metadata', {}).get('source', ''),
-            'category': item.get('metadata', {}).get('category', ''),
+            'source_raw': item.get('source_raw', ''),  # 原始來源單位名稱
+
+            # === 被處分人資訊 ===
+            'institution': institution_name,  # 機構名稱 (簡化)
+            'penalized_entity': metadata_dict.get('penalized_entity', {}),  # 完整被處分人資訊
+
+            # === 處分資訊 ===
+            'doc_number': metadata_dict.get('doc_number', ''),  # 發文字號
+            'penalty_amount': penalty_amount,  # 處分金額 (數字)
+            'penalty_amount_text': penalty_amount_text,  # 處分金額 (文字)
+
+            # === 分類標籤 ===
+            'source': metadata_dict.get('source', ''),  # 標準化來源代碼
+            'category': metadata_dict.get('category', ''),  # 案件類型
+
+            # === 來源追蹤 ===
+            'original_url': detail_url,  # 原始網頁連結
+            'crawl_time': item.get('crawl_time', ''),  # 資料抓取時間
+
+            # === 原始內容 (備份用,不上傳到 Gemini) ===
             'original_content': {
                 'text': content_text,
                 'html': content_html
             },
-            'applicable_laws': applicable_laws,
-            'law_links': law_links,  # 新增：法條連結
+
+            # === 法規資訊 ===
+            'applicable_laws': applicable_laws,  # 適用法條列表
+            'law_links': law_links,  # 法條連結映射
+
+            # === 附件資訊 ===
             'attachments': item.get('attachments', [])
         }
 

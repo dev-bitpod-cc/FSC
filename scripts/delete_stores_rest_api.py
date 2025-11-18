@@ -37,6 +37,11 @@ def delete_store_via_rest_api(store_id, api_key):
 
 def main():
     """主函式"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='使用 REST API 強制刪除 Gemini Stores')
+    parser.add_argument('--yes', '-y', action='store_true', help='跳過確認')
+    args = parser.parse_args()
 
     # 設定 API Key
     api_key = os.getenv('GEMINI_API_KEY')
@@ -44,24 +49,29 @@ def main():
         print("❌ 錯誤: 找不到 GEMINI_API_KEY")
         return
 
-    # 要刪除的 Store IDs (Store #7-13)
+    # 要刪除的 Store IDs (保留 Deploy 專案使用的)
+    # 保留: fileSearchStores/fscpenalties-tu709bvr1qti (FSC-Penalties-Deploy)
+    # 保留: fileSearchStores/fscpenaltycases1762854180-9kooa996ag5a (Sanction)
+
     stores_to_delete = [
-        ("Store #7", "fileSearchStores/fscteststore-m87rpvke09bn"),
-        ("Store #8", "fileSearchStores/fscannouncements150-1s4syh83mg6k"),
-        ("Store #9", "fileSearchStores/fscannouncements-z0ri8kcrrwfe"),
-        ("Store #10", "fileSearchStores/fsctestupload-4slqf03z2c5x"),
-        ("Store #11", "fileSearchStores/fscannouncementsall-86u9vp2mw8vc"),
-        ("Store #12", "fileSearchStores/fsctestannouncements-60r3k474fmf0"),
-        ("Store #13", "fileSearchStores/fsctestpenalties-5o5dqvd9a7ck"),
+        ("Store #1", "fileSearchStores/fscpenaltycases1762852550-df677oxvk9ke"),
+        ("Store #2", "fileSearchStores/fscpenaltycases1762853298-pp7xw875g3te"),
+        ("Store #3", "fileSearchStores/teststore-n2haofckqioh"),
+        ("Store #4", "fileSearchStores/fscpenaltycases1762853753-f1kefbyo3sqo"),
+        ("Store #5", "fileSearchStores/fscpenaltycases1762854027-y7a8l1qc6elv"),
+        ("Store #8", "fileSearchStores/fscpenaltiesoptimizedtest-ixrg0l5s4967"),
+        ("Store #9", "fileSearchStores/fscpenaltiesoptimized-amgl070m85d5"),
+        ("Store #10", "fileSearchStores/fscpenaltiesfsc490-eg8q35dtsquz"),
     ]
 
-    print("🗑️  使用 REST API 強制刪除 Stores")
+    print("🗑️  使用 REST API 強制刪除 Stores (force=true)")
     print("=" * 80)
     for name, store_id in stores_to_delete:
         print(f"   {name}: {store_id}")
     print("=" * 80)
 
-    input("\n按 Enter 確認刪除，或 Ctrl+C 取消...")
+    if not args.yes:
+        input("\n按 Enter 確認刪除，或 Ctrl+C 取消...")
 
     deleted_count = 0
     failed_stores = []

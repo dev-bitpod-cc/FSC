@@ -1,9 +1,9 @@
 # Claude Code 交接說明
 
-**日期**: 2025-11-14
+**日期**: 2025-11-18
 **專案**: FSC 金管會裁罰案件爬蟲與 RAG 系統
 
-## 當前狀態總覽
+## 當前狀態總覽 (2025-11-18)
 
 ### ✅ 已完成
 
@@ -309,13 +309,149 @@ Store ID: fileSearchStores/fscpenalties-ma1326u8ck77
 
 ---
 
-**最後更新**: 2025-11-14 18:15
+## RAG 優化工作 (2025-11-18)
+
+### 背景
+
+前期工作比較了 FSC 和 Sanction 兩個專案對裁罰案件的處理方式：
+
+- **FSC**: 爬取後結構化為 Markdown 上傳 → 查詢效果較差
+- **Sanction**: 爬取後轉為優化 Plain Text 上傳 → 查詢效果較好
+
+決定優化 FSC 專案，採用 Sanction 的 Plain Text 方式重新上傳。
+
+### 已完成工作
+
+1. **完整資料爬取** (630 筆，2004-2025)
+   - 使用 FSC 裁罰爬蟲重新爬取全部資料
+   - 包含網頁未顯示的歷史案件（5 筆）
+   - 資料位置：`data/penalties/raw.jsonl`
+
+2. **資料篩選** (490 筆，2012-01-01+)
+   - 篩選 2012-01-01 之後的資料，對應 Sanction 的 490 筆
+   - 腳本：`scripts/filter_penalties_2012.py`
+   - 輸出：`data/penalties/filtered_2012.jsonl`
+
+3. **優化 Plain Text 生成** (490 筆)
+   - 參考 Sanction 的優化方式
+   - 移除網頁雜訊，保留核心內容
+   - 添加結構化欄位（發文日期、來源單位、罰款金額、發文字號）
+   - 輸出目錄：`data/plaintext_optimized/penalties_individual/`
+   - 檔案格式：`fsc_pen_YYYYMMDD_NNNN.txt`
+
+4. **Store 清理**
+   - 刪除所有測試用 Stores（9 個）
+   - 保留 Deploy 專案使用的 Stores（2 個）：
+     - `fileSearchStores/fscpenalties-tu709bvr1qti` (FSC-Penalties-Deploy)
+     - `fileSearchStores/fscpenaltycases1762854180-9kooa996ag5a` (Sanction)
+
+### 發現的問題
+
+#### 問題：Upload Manifest 導致檔案缺失
+
+**症狀**：
+- 目錄中有 490 個檔案
+- 上傳腳本只上傳 480 個
+- 顯示「跳過已上傳」10 個檔案
+
+**根本原因**：
+- `GeminiUploader` 使用 `data/temp_uploads/upload_manifest.json` 記錄上傳狀態
+- Manifest 保留了之前測試上傳的記錄
+- 這 10 個檔案在測試中成功上傳到**已刪除的舊 Store**
+- 新上傳任務載入 manifest 後誤以為已上傳，跳過這些檔案
+
+**影響**：
+- 新 Store 會缺少 10 個檔案（實際只有 480 個，應該有 490 個）
+- 查詢時這 10 個案件無法被檢索到
+
+**解決方案**：
+```bash
+# 清除 manifest
+rm -f data/temp_uploads/upload_manifest.json
+
+# 重新上傳全部 490 個檔案
+python scripts/upload_optimized_to_gemini.py \
+  --plaintext-dir data/plaintext_optimized/penalties_individual \
+  --store-name fsc-penalties-plaintext \
+  --delay 2.0
+```
+
+### 待完成工作
+
+1. **在新電腦重新上傳**（490 筆 Plain Text）
+   ```bash
+   # 1. 確保環境設定
+   source venv/bin/activate
+
+   # 2. 清除 manifest（重要！）
+   rm -f data/temp_uploads/upload_manifest.json
+
+   # 3. 上傳（使用穩定的 2 步驟方法，2.0 秒延遲）
+   python scripts/upload_optimized_to_gemini.py \
+     --plaintext-dir data/plaintext_optimized/penalties_individual \
+     --store-name fsc-penalties-plaintext \
+     --delay 2.0
+
+   # 預計時間：約 80 分鐘（490 × 10 秒/檔案）
+   # 預期成功率：99%+（參考之前 493/495 = 99.6%）
+   ```
+
+2. **驗證上傳完整性**
+   ```bash
+   python scripts/verify_gemini_upload.py \
+     --store-id <new-store-id> \
+     --local-dir data/plaintext_optimized/penalties_individual
+   ```
+
+3. **查詢效果測試**
+   - 與 Sanction 專案比較查詢品質
+   - 測試複雜查詢（多條件、時間範圍等）
+   - 確認是否達到優化目標
+
+### 重要提醒
+
+⚠️ **Manifest 管理**
+- 每次重新上傳前**必須**清除 `data/temp_uploads/upload_manifest.json`
+- 否則會跳過之前成功的檔案，導致新 Store 資料不完整
+- Manifest 機制是為斷點續傳設計，但跨 Store 時會造成問題
+
+⚠️ **上傳方法**
+- 使用 2 步驟方法：`upload_file()` + `import_file()`
+- 不要使用新的 1 步驟 API（未經驗證，失敗率高）
+- 延遲設定：2.0 秒/檔案（已驗證穩定）
+
+⚠️ **Store ID 記錄**
+- 上傳完成後記錄新 Store ID
+- 更新前端專案配置
+- 刪除舊的測試 Store
+
+### 腳本清單
+
+**資料準備**：
+- `scripts/filter_penalties_2012.py` - 篩選 2012+ 資料
+- `scripts/generate_optimized_plaintext.py` - 生成優化 Plain Text
+
+**Store 管理**：
+- `scripts/delete_stores_rest_api.py` - 使用 REST API 刪除 Stores
+- `scripts/cleanup_unused_stores.py` - 清理未使用的 Stores
+
+**上傳與驗證**：
+- `scripts/upload_optimized_to_gemini.py` - 上傳 Plain Text
+- `scripts/verify_gemini_upload.py` - 驗證上傳完整性
+
+---
+
+**最後更新**: 2025-11-18 18:30
 **當前狀態**:
-- ✅ 已爬取乾淨資料（495 筆，0 誤抓附件）
-- ✅ 已生成優化映射檔（法規去重，平均 1.4 條）
-- ✅ 已整合前端（映射檔已同步到 FSC-Penalties-Deploy）
-- ⏳ Gemini Store 上傳中（預計 18:45 完成）
+- ✅ 已爬取完整資料（630 筆）
+- ✅ 已篩選 2012+ 資料（490 筆）
+- ✅ 已生成優化 Plain Text（490 筆）
+- ✅ 已清理測試 Stores（保留 2 個 Deploy 用）
+- ✅ 已清除 upload manifest
+- ⏳ **準備在新電腦重新上傳**
 
 **下次繼續**:
-1. 在 Streamlit Cloud 更新 Store ID：`fileSearchStores/fscpenalties-tu709bvr1qti`
-2. 測試查詢功能，確認映射檔顯示正常
+1. 清除 `data/temp_uploads/upload_manifest.json`（已完成）
+2. 上傳全部 490 個 Plain Text 檔案
+3. 驗證上傳完整性（確保 490/490）
+4. 測試查詢效果並與 Sanction 比較
