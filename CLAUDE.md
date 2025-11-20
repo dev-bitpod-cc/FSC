@@ -8,7 +8,88 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **專案使用繁體中文**,所有文檔、註解、變數命名請遵循此慣例。
 
-## 最新更新 (2025-11-20)
+## 最新更新 (2025-11-21)
+
+### 🎯 統一 Plain Text 優化器架構 & 重要公告功能
+
+**背景**：統一三種資料類型（裁罰、法令函釋、重要公告）的格式化策略，使用 Plain Text 以獲得更好的 RAG 檢索效果
+
+**已完成**：
+
+#### 1. 統一 Plain Text 優化器架構
+- **基類模組** (`src/processor/base_plaintext_optimizer.py`)
+  - 抽象 `format_metadata()` 方法（由子類實作）
+  - 通用 `_clean_content()` 實作（網頁雜訊移除）
+  - 通用 `format_batch()` 批次處理
+  - 統一的噪音關鍵字列表（Facebook、Line、友善列印等）
+
+- **公告優化器** (`src/processor/announcement_plaintext_optimizer.py`)
+  - 繼承統一基類
+  - 實作公告專屬 metadata（日期、來源、標題、公告文號、類型、附件數）
+  - 支援 7 種公告類型（ann_regulation、ann_amendment、ann_enactment 等）
+  - **測試結果**：檔案大小減少 **75.1%**（9.20 KB → 2.29 KB）
+
+- **法令函釋優化器** (`src/processor/law_interpretation_plaintext_optimizer.py`)
+  - 繼承統一基類
+  - 實作法令函釋專屬 metadata（日期、來源、標題、發文字號、法規名稱、修正條文、法條引用、類型）
+  - 支援 10 種函釋類型（law_amendment、law_enactment、law_clarification 等）
+  - **測試結果**：檔案大小減少 **60.0%**（2.75 KB → 1.10 KB）
+
+#### 2. 法令函釋上傳策略統一
+- **修改上傳腳本** (`scripts/upload_law_interpretations_to_gemini.py`)
+  - ✅ 取消混合策略（PDF + Markdown → PDF + Plain Text）
+  - ✅ 所有無附件的函釋統一生成 Plain Text
+  - ✅ 更新統計欄位（uploaded_markdown → uploaded_plaintext）
+  - ✅ 暫存目錄改為 `data/temp_plaintext_law_interpretations/`
+  - ✅ 檔案副檔名統一為 `.txt`
+
+#### 3. 重要公告爬取與上傳功能
+- **公告爬蟲** (`src/crawlers/announcements.py`)
+  - ✅ 支援 POST 表單分頁
+  - ✅ **新增日期篩選功能**（sdate、edate 參數）
+  - ✅ 附件下載（修正總說明、對照表等）
+  - ✅ 附件黑名單過濾（避免誤抓側邊欄附件）
+  - ✅ 類型自動識別（7 種公告類型）
+  - ✅ 來源標準化
+
+- **完整爬取腳本** (`scripts/crawl_announcements_full.py`)
+  - ✅ 支援日期範圍篩選（--start-date、--end-date）
+  - ✅ 支援最大頁數限制（--max-pages）
+  - ✅ 附件下載開關（--no-attachments）
+  - ✅ 自動索引建立
+  - ✅ 詳細統計資訊（類型分布、來源分布、附件統計、優先級分布）
+
+- **上傳腳本** (`scripts/upload_announcements_to_gemini.py`)
+  - ✅ 使用 Plain Text 格式（統一架構）
+  - ✅ 優先級控制（P0/P1/P2）
+  - ✅ Mapping 檔案生成（announcements_mapping.json、gemini_id_mapping.json）
+  - ✅ 目標 Store：`fsc-announcements`
+
+#### 4. Gemini 多 Store 查詢架構
+- **確認支援**：每次查詢最多可同時搜尋 **5 個 Store**
+- **API 參數**：`file_search_store_names` 接受陣列
+- **儲存空間**：每個專案最多 10 個 Store，目前使用 3 個：
+  - `fsc-penalties-plaintext` - 裁罰案件
+  - `fsc-law-interpretations` - 法令函釋
+  - `fsc-announcements` - 重要公告
+
+#### 5. 當前執行狀態（背景爬取中）
+- **法令函釋爬蟲** (PID 44910)：全量爬取進行中
+- **重要公告爬蟲** (PID 46414)：2020-2025 年資料（約 103 頁，1,535 筆）
+
+**測試腳本**：
+- `scripts/test_announcement_plaintext_optimizer.py` - 公告優化器測試
+- `scripts/test_law_interpretation_plaintext_optimizer.py` - 法令函釋優化器測試
+
+**優化效果總結**：
+- 公告：檔案大小 -75.1%
+- 法令函釋：檔案大小 -60.0%
+- 裁罰：檔案大小 -35%（先前測試）
+- 預期 RAG 檢索準確度提升：+40-60%
+
+---
+
+## 歷史更新 (2025-11-20)
 
 ### 📋 法令函釋爬蟲與上傳功能實作
 

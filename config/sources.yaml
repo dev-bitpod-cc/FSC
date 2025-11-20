@@ -40,14 +40,21 @@ source_units:
   "中央存保公司": "cdic"
   "中央存款保險公司": "cdic"
 
-# 公告類型對應
+# 公告類型對應（使用 ann_ 前綴，避免與 law_ 前綴衝突）
+# 參考文檔：docs/naming_convention_unified.md, docs/announcements_strategy_analysis_v2.md
 announcement_categories:
-  "修正": "amendment"
-  "訂定": "enactment"
-  "廢止": "abolition"
-  "預告": "advance_notice"
-  "解釋令": "interpretation"
-  "函": "official_letter"
+  # P0 核心類型（極高優先級）
+  "有關": "ann_regulation"        # 一般公告（令）- 最重要！可回答 Q5, Q6
+
+  # P1 補充類型（高優先級）
+  "修正": "ann_amendment"         # 修正類 - 法規修正
+  "訂定": "ann_enactment"         # 訂定類 - 新法規訂定
+  "指定": "ann_designation"       # 指定類 - 指定機構/範圍
+
+  # P2 輔助類型（中優先級）
+  "預告": "ann_draft"             # 預告類 - 草案預告
+  "發布": "ann_publication"       # 發布類 - 法規發布
+  "廢止": "ann_repeal"            # 廢止類 - 法規廢止
 
 # 裁罰案件違規類型對應
 penalty_categories:

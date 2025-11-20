@@ -33,18 +33,19 @@ def test_upload_strategy():
 
     logger.info(f"讀取 {len(items)} 筆測試資料\n")
 
-    # 優先級定義
+    # 優先級定義（使用 law_ 前綴）
     priority_mapping = {
-        'amendment': 0,
-        'enactment': 0,
-        'clarification': 0,
-        'approval': 1,
-        'announcement': 1,
-        'repeal': 2,
-        'adjustment': 2,
-        'notice': 2,
-        'other': 3,
-        'unknown': 3,
+        'law_amendment': 0,
+        'law_enactment': 0,
+        'law_clarification': 0,
+        'law_interpretation_decree': 0,
+        'law_approval': 1,
+        'law_publication': 1,  # 發布/公布型（原 announcement）
+        'law_repeal': 2,
+        'law_adjustment': 2,
+        'law_notice': 2,
+        'law_other': 3,
+        'law_unknown': 3,
     }
 
     # 統計
@@ -74,7 +75,7 @@ def test_upload_strategy():
         file_path = None
 
         # 修正型：只上傳對照表
-        if category == 'amendment':
+        if category == 'law_amendment':
             comparison_table = None
             for att in attachments:
                 if att.get('classification') == 'comparison_table':
@@ -92,7 +93,7 @@ def test_upload_strategy():
                 stats['skip'] += 1
 
         # 訂定型 / 函釋型
-        elif category in ['enactment', 'clarification', 'interpretation_decree']:
+        elif category in ['law_enactment', 'law_clarification', 'law_interpretation_decree']:
             if attachments:
                 pdf_att = None
                 for att in attachments:

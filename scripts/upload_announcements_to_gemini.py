@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
 """
-法令函釋上傳到 Gemini File Search
+重要公告上傳到 Gemini File Search
 
 功能:
-1. 從 JSONL 讀取法令函釋資料
-2. 根據類型和附件情況決定上傳策略：
-   - 修正型：只上傳對照表 PDF（最重要）
-   - 訂定型/函釋型：有附件上傳 PDF，無附件生成 Plain Text
-   - 統一策略：所有無附件的函釋都生成 Plain Text（取消 Markdown）
+1. 從 JSONL 讀取重要公告資料
+2. 生成優化的 Plain Text 格式
 3. 上傳到 Gemini File Search Store
-4. 生成 law_interpretations_mapping.json 和 gemini_id_mapping.json
+4. 生成 announcements_mapping.json 和 gemini_id_mapping.json
 
-上傳策略 (基於 docs/law_interpretations_analysis.md):
-- P0 類型 (amendment, enactment, clarification): 優先上傳
-- P1 類型 (approval, announcement): 次要上傳
-- P2 類型 (repeal, adjustment): 選擇性上傳
+上傳策略:
+- P0 類型 (ann_regulation): 優先上傳
+- P1 類型 (ann_amendment, ann_enactment, ann_designation): 次要上傳
+- P2 類型 (ann_draft, ann_publication, ann_repeal): 選擇性上傳
 """
 
 import sys
 import json
 import time
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 
 # 加入專案根目錄到 Python 路徑
@@ -30,16 +27,16 @@ sys.path.insert(0, str(project_root))
 
 from loguru import logger
 from src.storage.jsonl_handler import JSONLHandler
-from src.processor.law_interpretation_plaintext_optimizer import LawInterpretationPlainTextOptimizer
+from src.processor.announcement_plaintext_optimizer import AnnouncementPlainTextOptimizer
 from dotenv import load_dotenv
 import os
 import google.generativeai as genai
 
 
-class LawInterpretationsUploader:
-    """法令函釋上傳器"""
+class AnnouncementsUploader:
+    """重要公告上傳器"""
 
-    def __init__(self, api_key: str, store_name: str = 'fsc-law-interpretations'):
+    def __init__(self, api_key: str, store_name: str = 'fsc-announcements'):
         """
         初始化上傳器
 
@@ -53,32 +50,29 @@ class LawInterpretationsUploader:
         # 初始化 Gemini API
         genai.configure(api_key=api_key)
 
-        # 優先級定義（使用 law_ 前綴）
+        # 優先級定義（使用 ann_ 前綴）
         self.priority_mapping = {
-            # P0: 核心類型 (69%)
-            'law_amendment': 0,
-            'law_enactment': 0,
-            'law_clarification': 0,
-            'law_interpretation_decree': 0,  # 解釋令（訂定型子類）
-            # P1: 補充類型 (17%)
-            'law_approval': 1,
-            'law_publication': 1,  # 發布/公布型（原 announcement）
-            # P2: 歷史類型 (15%)
-            'law_repeal': 2,
-            'law_adjustment': 2,
-            'law_notice': 2,
+            # P0: 核心類型（一般公告令）
+            'ann_regulation': 0,
+            # P1: 補充類型
+            'ann_amendment': 1,
+            'ann_enactment': 1,
+            'ann_designation': 1,
+            # P2: 輔助類型
+            'ann_draft': 2,
+            'ann_publication': 2,
+            'ann_repeal': 2,
             # 其他
-            'law_other': 3,
-            'law_unknown': 3,
+            'ann_other': 3,
+            'unknown': 3,
         }
 
         # 初始化格式化器
-        self.formatter = LawInterpretationPlainTextOptimizer()
+        self.optimizer = AnnouncementPlainTextOptimizer()
 
         # 上傳統計
         self.stats = {
             'total': 0,
-            'uploaded_pdf': 0,
             'uploaded_plaintext': 0,
             'skipped': 0,
             'failed': 0,
@@ -88,7 +82,7 @@ class LawInterpretationsUploader:
         self.mapping_data = {}
         self.gemini_id_mapping = {}
 
-        logger.info(f"初始化法令函釋上傳器")
+        logger.info(f"初始化重要公告上傳器")
         logger.info(f"Store 名稱: {store_name}")
 
     def get_or_create_store(self) -> str:
@@ -99,15 +93,9 @@ class LawInterpretationsUploader:
             Store ID
         """
         try:
-            # 列出所有 stores
-            stores = genai.list_files()
-
-            # 尋找同名 store (實際上 list_files 不會返回 store，需要另外處理)
-            # 這裡我們直接創建新的 store
             logger.info(f"創建新的 File Search Store: {self.store_name}")
 
             # 使用新的 API 創建 store
-            # 注意：這裡需要根據實際 Gemini API 文檔調整
             store = genai.create_file_store(display_name=self.store_name)
             store_id = store.name
 
@@ -120,10 +108,10 @@ class LawInterpretationsUploader:
 
     def should_upload(self, item: Dict[str, Any], priority_level: int = 1) -> bool:
         """
-        判斷是否應該上傳此函釋
+        判斷是否應該上傳此公告
 
         Args:
-            item: 函釋資料
+            item: 公告資料
             priority_level: 優先級門檻 (0=P0, 1=P0+P1, 2=全部)
 
         Returns:
@@ -133,95 +121,6 @@ class LawInterpretationsUploader:
         item_priority = self.priority_mapping.get(category, 3)
 
         return item_priority <= priority_level
-
-    def determine_upload_strategy(self, item: Dict[str, Any]) -> Tuple[str, Optional[str]]:
-        """
-        決定上傳策略
-
-        Args:
-            item: 函釋資料
-
-        Returns:
-            (upload_type, file_path)
-            - upload_type: 'pdf' 或 'plaintext' 或 'skip'
-            - file_path: PDF 路徑或 None (如果是 plaintext)
-        """
-        category = item.get('metadata', {}).get('category', 'unknown')
-        attachments = item.get('attachments', [])
-
-        # 修正型：只上傳對照表 PDF
-        if category == 'law_amendment':
-            # 尋找對照表
-            for att in attachments:
-                if att.get('classification') == 'comparison_table':
-                    # 檢查是否已下載
-                    local_path = att.get('local_path')
-                    if local_path and Path(local_path).exists():
-                        return ('pdf', local_path)
-                    else:
-                        logger.warning(f"對照表未下載: {item['id']}")
-                        return ('skip', None)
-
-            # 如果沒有對照表，跳過
-            logger.warning(f"修正型函釋缺少對照表: {item['id']}")
-            return ('skip', None)
-
-        # 訂定型 / 函釋型：有附件上傳，無附件生成 Plain Text
-        elif category in ['law_enactment', 'law_clarification', 'law_interpretation_decree']:
-            if attachments:
-                # 上傳第一個 PDF 附件
-                for att in attachments:
-                    if att.get('type') == 'pdf':
-                        local_path = att.get('local_path')
-                        if local_path and Path(local_path).exists():
-                            return ('pdf', local_path)
-
-                # 沒有 PDF，生成 Plain Text
-                return ('plaintext', None)
-            else:
-                # 無附件，生成 Plain Text
-                return ('plaintext', None)
-
-        # 其他類型：根據附件情況決定
-        else:
-            if attachments:
-                # 有附件，上傳 PDF
-                for att in attachments:
-                    if att.get('type') == 'pdf':
-                        local_path = att.get('local_path')
-                        if local_path and Path(local_path).exists():
-                            return ('pdf', local_path)
-                return ('plaintext', None)
-            else:
-                # 無附件，生成 Plain Text
-                return ('plaintext', None)
-
-    def upload_pdf(self, pdf_path: str, display_name: str) -> Optional[str]:
-        """
-        上傳 PDF 到 Gemini
-
-        Args:
-            pdf_path: PDF 路徑
-            display_name: 顯示名稱
-
-        Returns:
-            File ID 或 None
-        """
-        try:
-            logger.info(f"上傳 PDF: {display_name}")
-
-            # 上傳檔案
-            uploaded_file = genai.upload_file(
-                path=pdf_path,
-                display_name=display_name
-            )
-
-            logger.info(f"  ✓ 上傳成功: {uploaded_file.name}")
-            return uploaded_file.name
-
-        except Exception as e:
-            logger.error(f"  ✗ 上傳失敗: {e}")
-            return None
 
     def upload_plaintext(self, plaintext_content: str, display_name: str) -> Optional[str]:
         """
@@ -238,7 +137,7 @@ class LawInterpretationsUploader:
             logger.info(f"上傳 Plain Text: {display_name}")
 
             # 建立暫存檔案
-            temp_dir = Path('data/temp_plaintext_law_interpretations')
+            temp_dir = Path('data/temp_plaintext_announcements')
             temp_dir.mkdir(parents=True, exist_ok=True)
 
             temp_file = temp_dir / f"{display_name}.txt"
@@ -263,10 +162,10 @@ class LawInterpretationsUploader:
 
     def process_item(self, item: Dict[str, Any], delay: float = 2.0) -> bool:
         """
-        處理單個函釋
+        處理單個公告
 
         Args:
-            item: 函釋資料
+            item: 公告資料
             delay: 上傳延遲（秒）
 
         Returns:
@@ -280,38 +179,19 @@ class LawInterpretationsUploader:
         logger.info(f"  標題: {title[:60]}...")
         logger.info(f"  類型: {category}")
 
-        # 決定上傳策略
-        upload_type, file_path = self.determine_upload_strategy(item)
-
-        if upload_type == 'skip':
-            logger.info(f"  → 跳過")
-            self.stats['skipped'] += 1
-            self.stats['total'] += 1
-            return False
-
         # 生成顯示名稱
         date = item.get('date', 'unknown')
         source = item.get('metadata', {}).get('source', 'unknown')
         display_name = f"{date}_{source}_{category}_{item_id}"
 
-        # 上傳
-        file_id = None
-
-        if upload_type == 'pdf':
-            logger.info(f"  → 上傳 PDF: {Path(file_path).name}")
-            file_id = self.upload_pdf(file_path, display_name)
-            if file_id:
-                self.stats['uploaded_pdf'] += 1
-
-        elif upload_type == 'plaintext':
-            logger.info(f"  → 生成並上傳 Plain Text")
-            # 生成 Plain Text
-            plaintext_content = self.formatter.format_item(item)
-            file_id = self.upload_plaintext(plaintext_content, display_name)
-            if file_id:
-                self.stats['uploaded_plaintext'] += 1
+        # 生成 Plain Text
+        logger.info(f"  → 生成並上傳 Plain Text")
+        plaintext_content = self.optimizer.format_item(item)
+        file_id = self.upload_plaintext(plaintext_content, display_name)
 
         if file_id:
+            self.stats['uploaded_plaintext'] += 1
+
             # 記錄到 mapping
             self.gemini_id_mapping[item_id] = file_id
 
@@ -323,9 +203,8 @@ class LawInterpretationsUploader:
                 'date': date,
                 'source': source,
                 'category': category,
-                'law_name': item.get('metadata', {}).get('law_name', ''),
-                'document_number': item.get('metadata', {}).get('document_number', ''),
-                'upload_type': upload_type,
+                'announcement_number': item.get('metadata', {}).get('announcement_number', ''),
+                'upload_type': 'plaintext',
                 'uploaded_at': datetime.now().isoformat(),
             }
 
@@ -334,7 +213,6 @@ class LawInterpretationsUploader:
             # 延遲
             time.sleep(delay)
             return True
-
         else:
             self.stats['failed'] += 1
             self.stats['total'] += 1
@@ -342,13 +220,13 @@ class LawInterpretationsUploader:
 
     def upload_all(
         self,
-        jsonl_path: str = 'data/law_interpretations/raw.jsonl',
+        jsonl_path: str = 'data/announcements/raw.jsonl',
         priority_level: int = 1,
         delay: float = 2.0,
         max_items: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        上傳所有法令函釋
+        上傳所有重要公告
 
         Args:
             jsonl_path: JSONL 檔案路徑
@@ -360,26 +238,27 @@ class LawInterpretationsUploader:
             統計資訊
         """
         logger.info("=" * 70)
-        logger.info("開始上傳法令函釋到 Gemini File Search")
+        logger.info("開始上傳重要公告到 Gemini File Search")
         logger.info("=" * 70)
 
         # 讀取資料
-        handler = JSONLHandler()
-        all_items = handler.read_all('law_interpretations')
+        logger.info(f"\n讀取資料: {jsonl_path}")
+        storage = JSONLHandler()
+        all_items = storage.read_all('announcements')
 
         if not all_items:
-            logger.error("找不到法令函釋資料")
+            logger.error("沒有資料可上傳")
             return self.stats
 
-        logger.info(f"總共 {len(all_items)} 筆法令函釋")
+        logger.info(f"總資料筆數: {len(all_items)}")
 
-        # 過濾優先級
+        # 篩選優先級
         filtered_items = [
             item for item in all_items
             if self.should_upload(item, priority_level)
         ]
 
-        logger.info(f"符合優先級 P{priority_level} 的函釋: {len(filtered_items)} 筆")
+        logger.info(f"符合優先級 P{priority_level} 的公告: {len(filtered_items)} 筆")
 
         # 限制數量（測試用）
         if max_items:
@@ -394,7 +273,7 @@ class LawInterpretationsUploader:
 
         logger.info(f"\n類型分布:")
         for cat, count in sorted(category_counts.items(), key=lambda x: x[1], reverse=True):
-            logger.info(f"  {cat}: {count} 筆")
+            logger.info(f"  {cat or 'None'}: {count} 筆")
 
         logger.info(f"\n開始上傳...")
         logger.info("-" * 70)
@@ -422,8 +301,8 @@ class LawInterpretationsUploader:
         logger.info("儲存 Mapping 檔案")
         logger.info("=" * 70)
 
-        # 1. law_interpretations_mapping.json (詳細資訊)
-        mapping_file = Path('data/law_interpretations/law_interpretations_mapping.json')
+        # 1. announcements_mapping.json (詳細資訊)
+        mapping_file = Path('data/announcements/announcements_mapping.json')
         mapping_file.parent.mkdir(parents=True, exist_ok=True)
 
         with open(mapping_file, 'w', encoding='utf-8') as f:
@@ -433,7 +312,7 @@ class LawInterpretationsUploader:
         logger.info(f"  共 {len(self.mapping_data)} 筆")
 
         # 2. gemini_id_mapping.json (簡化版本)
-        gemini_mapping_file = Path('data/law_interpretations/gemini_id_mapping.json')
+        gemini_mapping_file = Path('data/announcements/gemini_id_mapping.json')
 
         with open(gemini_mapping_file, 'w', encoding='utf-8') as f:
             json.dump(self.gemini_id_mapping, f, ensure_ascii=False, indent=2)
@@ -447,14 +326,12 @@ class LawInterpretationsUploader:
         logger.info("=" * 70)
 
         logger.info(f"總處理數: {self.stats['total']}")
-        logger.info(f"  ✓ 上傳 PDF: {self.stats['uploaded_pdf']}")
         logger.info(f"  ✓ 上傳 Plain Text: {self.stats['uploaded_plaintext']}")
         logger.info(f"  - 跳過: {self.stats['skipped']}")
         logger.info(f"  ✗ 失敗: {self.stats['failed']}")
 
         success_rate = (
-            (self.stats['uploaded_pdf'] + self.stats['uploaded_plaintext']) /
-            self.stats['total'] * 100
+            self.stats['uploaded_plaintext'] / self.stats['total'] * 100
             if self.stats['total'] > 0 else 0
         )
 
@@ -465,35 +342,54 @@ def main():
     """主函數"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='上傳法令函釋到 Gemini File Search')
+    parser = argparse.ArgumentParser(description='上傳重要公告到 Gemini File Search')
     parser.add_argument('--priority', type=int, default=1, choices=[0, 1, 2],
                         help='優先級門檻 (0=P0 only, 1=P0+P1, 2=全部)')
     parser.add_argument('--delay', type=float, default=2.0,
                         help='上傳延遲（秒）')
     parser.add_argument('--max-items', type=int, default=None,
                         help='最大上傳數量（測試用）')
-    parser.add_argument('--store-name', type=str, default='fsc-law-interpretations',
+    parser.add_argument('--store-name', type=str, default='fsc-announcements',
                         help='Store 名稱')
 
     args = parser.parse_args()
 
-    # 載入環境變數
+    # 設定日誌
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    log_file = f"logs/announcements_upload_{timestamp}.log"
+    Path('logs').mkdir(exist_ok=True)
+
+    logger.add(
+        log_file,
+        rotation="100 MB",
+        retention="30 days",
+        level="DEBUG"
+    )
+
+    logger.info(f"日誌檔案: {log_file}")
+
+    # 載入 API Key
     load_dotenv()
     api_key = os.getenv('GEMINI_API_KEY')
 
     if not api_key:
-        logger.error("未設定 GEMINI_API_KEY")
+        logger.error("請設定 GEMINI_API_KEY 環境變數")
         return
 
     # 初始化上傳器
-    uploader = LawInterpretationsUploader(api_key, store_name=args.store_name)
+    uploader = AnnouncementsUploader(api_key, store_name=args.store_name)
 
     # 上傳
-    uploader.upload_all(
+    stats = uploader.upload_all(
         priority_level=args.priority,
         delay=args.delay,
         max_items=args.max_items
     )
+
+    logger.info("\n" + "=" * 70)
+    logger.info("完成！")
+    logger.info("=" * 70)
+    logger.info(f"日誌檔案: {log_file}")
 
 
 if __name__ == '__main__':

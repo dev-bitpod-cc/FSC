@@ -11,15 +11,15 @@ class LawInterpretationMarkdownFormatter:
     def __init__(self):
         """初始化格式化器"""
         self.category_names = {
-            'amendment': '修正',
-            'enactment': '訂定',
-            'interpretation_decree': '函釋',
-            'clarification': '有關',
-            'repeal': '廢止',
-            'announcement': '公告',
-            'approval': '核准',
-            'adjustment': '調整',
-            'notice': '通知'
+            'law_amendment': '修正',
+            'law_enactment': '訂定',
+            'law_interpretation_decree': '函釋',
+            'law_clarification': '有關',
+            'law_repeal': '廢止',
+            'law_publication': '公告',  # 發布/公布型（原 announcement）
+            'law_approval': '核准',
+            'law_adjustment': '調整',
+            'law_notice': '通知'
         }
 
         self.source_names = {
@@ -98,9 +98,9 @@ class LawInterpretationMarkdownFormatter:
             # 修正/訂定條文
             amended_articles = metadata.get('amended_articles')
             if amended_articles:
-                if category == 'amendment':
+                if category == 'law_amendment':
                     md_lines.append(f"- **修正條文**: {amended_articles}")
-                elif category == 'enactment':
+                elif category == 'law_enactment':
                     md_lines.append(f"- **訂定條文**: {amended_articles}")
 
             # 法條參照
@@ -459,15 +459,15 @@ class BatchLawInterpretationMarkdownFormatter(LawInterpretationMarkdownFormatter
 
         # 類型簡稱映射
         category_abbr = {
-            'amendment': '修正',
-            'enactment': '訂定',
-            'interpretation_decree': '函釋',
-            'clarification': '有關',
-            'repeal': '廢止',
-            'announcement': '公告',
-            'approval': '核准',
-            'adjustment': '調整',
-            'notice': '通知'
+            'law_amendment': '修正',
+            'law_enactment': '訂定',
+            'law_interpretation_decree': '函釋',
+            'law_clarification': '有關',
+            'law_repeal': '廢止',
+            'law_publication': '公告',  # 發布/公布型（原 announcement）
+            'law_approval': '核准',
+            'law_adjustment': '調整',
+            'law_notice': '通知'
         }
 
         def sanitize_filename(text: str, max_length: int = 50) -> str:

@@ -13,12 +13,14 @@ from ..utils.helpers import clean_text, parse_date, normalize_url, generate_id
 class AnnouncementCrawler(BaseFSCCrawler):
     """重要公告爬蟲 (使用 POST 表單)"""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any], start_date: str = None, end_date: str = None):
         """
         初始化爬蟲
 
         Args:
             config: 配置字典
+            start_date: 起始日期（格式: YYYY-MM-DD）
+            end_date: 結束日期（格式: YYYY-MM-DD）
         """
         super().__init__(config)
 
@@ -34,6 +36,15 @@ class AnnouncementCrawler(BaseFSCCrawler):
             'page': '1',
             'pagesize': '15',  # 每頁15筆
         }
+
+        # 添加日期篩選（如果有提供）
+        if start_date:
+            self.form_data['sdate'] = start_date.replace('-', '/')  # 轉換為 YYYY/MM/DD 格式
+            logger.info(f"設定起始日期: {start_date}")
+
+        if end_date:
+            self.form_data['edate'] = end_date.replace('-', '/')  # 轉換為 YYYY/MM/DD 格式
+            logger.info(f"設定結束日期: {end_date}")
 
         # 禁用 SSL 驗證 (金管會憑證問題)
         self.session.verify = False
@@ -139,6 +150,21 @@ class AnnouncementCrawler(BaseFSCCrawler):
         # 基本資料
         detail = list_item.copy()
 
+        # 生成唯一 ID (格式: fsc_ann_YYYYMMDD_NNNN)
+        # 確保 list_index 是整數
+        try:
+            list_index = int(list_item.get('list_index', '0'))
+        except (ValueError, TypeError):
+            list_index = 0
+
+        if 'date' in list_item and list_item['date']:
+            detail['id'] = generate_id('ann', list_item['date'], list_index)
+        else:
+            # 如果沒有日期，使用當前時間
+            import datetime
+            today = datetime.date.today().strftime('%Y-%m-%d')
+            detail['id'] = generate_id('ann', today, list_index)
+
         try:
             # 提取內容 - 嘗試多種選擇器
             content_div = None
@@ -174,11 +200,31 @@ class AnnouncementCrawler(BaseFSCCrawler):
                     'html': ''
                 }
 
-            # 提取附件
+            # 提取附件（只從內容區域 content_div 抓取，避免誤抓側邊欄附件）
             attachments = []
-            for link in soup.select('a'):
+
+            # 不相關附件關鍵字黑名單（避免誤抓）
+            attachment_blacklist = [
+                '失智者經濟安全保障',
+                '永續發展目標',
+                '自願檢視報告',
+                'SDGs',
+                'VNR'
+            ]
+
+            # 只從內容區域選擇附件連結
+            search_area = content_div if content_div else soup
+            for link in search_area.select('a'):
                 href = link.get('href', '')
+                link_text = clean_text(link.get_text())
+
+                # 檢查是否為附件連結
                 if any(ext in href.lower() for ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.odt']):
+                    # 檢查是否在黑名單中
+                    if any(keyword in link_text for keyword in attachment_blacklist):
+                        logger.debug(f"跳過不相關附件: {link_text}")
+                        continue
+
                     # 提取檔案類型（處理 URL 參數如 .pdf&flag=doc）
                     file_type = 'unknown'
                     if '.' in href:
@@ -193,7 +239,7 @@ class AnnouncementCrawler(BaseFSCCrawler):
                             file_type = ext_part
 
                     attachments.append({
-                        'name': clean_text(link.get_text()),
+                        'name': link_text,
                         'url': urljoin(self.base_url, href),
                         'type': file_type
                     })
@@ -235,14 +281,14 @@ class AnnouncementCrawler(BaseFSCCrawler):
 
     def crawl_page(self, page: int, **kwargs) -> List[Dict[str, Any]]:
         """
-        爬取單頁列表 (使用 POST 請求)
+        爬取單頁列表並獲取詳細內容 (使用 POST 請求)
 
         Args:
             page: 頁碼
             **kwargs: 其他參數
 
         Returns:
-            該頁的資料列表
+            該頁的資料列表（包含詳細內容）
         """
         logger.info(f"爬取列表頁: Page {page}")
 
@@ -261,19 +307,53 @@ class AnnouncementCrawler(BaseFSCCrawler):
             logger.error(f"列表頁請求失敗: Page {page}")
             return []
 
-        # 解析
+        # 解析列表頁
         try:
-            items = self.parse_list_page(response.text)
-            logger.info(f"列表頁解析成功: Page {page} - 找到 {len(items)} 筆資料")
+            list_items = self.parse_list_page(response.text)
+            logger.info(f"列表頁解析成功: Page {page} - 找到 {len(list_items)} 筆資料")
 
-            # 添加頁碼資訊
-            for item in items:
-                item['page'] = page
+            if not list_items:
+                return []
 
-            return items
+            # 爬取每個項目的詳細頁面
+            results = []
+            for item in list_items:
+                try:
+                    detail_url = item.get('detail_url')
+                    if not detail_url:
+                        logger.warning(f"缺少 detail_url: {item.get('title', 'N/A')}")
+                        continue
+
+                    logger.info(f"爬取詳細頁: {item['title'][:60]}...")
+
+                    # 請求延遲
+                    time.sleep(self.request_interval)
+
+                    # 發送請求
+                    detail_response = self.fetch_with_retry(detail_url, method='GET')
+                    if not detail_response:
+                        logger.warning(f"詳細頁請求失敗: {detail_url}")
+                        continue
+
+                    # 解析詳細頁
+                    detail_data = self.parse_detail_page(detail_response.text, item)
+
+                    # 添加頁碼資訊
+                    detail_data['page'] = page
+
+                    results.append(detail_data)
+
+                except Exception as e:
+                    logger.error(f"處理詳細頁失敗: {item.get('title', 'N/A')} - {e}")
+                    continue
+
+            logger.info(f"✓ 第 {page} 頁完成: {len(results)}/{len(list_items)} 筆")
+            return results
 
         except Exception as e:
             logger.error(f"列表頁解析失敗: Page {page} - {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return []
 
     def _download_attachments(self, detail: Dict[str, Any]) -> None:

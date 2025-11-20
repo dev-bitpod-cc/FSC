@@ -225,32 +225,32 @@ class LawInterpretationsCrawler(BaseFSCCrawler):
             title: 標題
 
         Returns:
-            類型代碼
+            類型代碼（帶 law_ 前綴）
         """
         if not title:
-            return 'unknown'
+            return 'law_unknown'
 
         # 優先匹配（避免誤判）
         if title.startswith('修正'):
-            return 'amendment'  # 修正型
+            return 'law_amendment'  # 修正型
         elif title.startswith('訂定'):
             if '解釋令' in title:
-                return 'interpretation_decree'  # 解釋令（訂定型子類）
-            return 'enactment'  # 訂定型
+                return 'law_interpretation_decree'  # 解釋令（訂定型子類）
+            return 'law_enactment'  # 訂定型
         elif title.startswith('有關'):
-            return 'clarification'  # 函釋型（有關）
+            return 'law_clarification'  # 函釋型（有關）
         elif title.startswith('廢止'):
-            return 'repeal'  # 廢止型
+            return 'law_repeal'  # 廢止型
         elif title.startswith('發布') or title.startswith('公布'):
-            return 'announcement'  # 發布/公布型
+            return 'law_publication'  # 發布/公布型（避免與 announcements 的 announcement 衝突）
         elif title.startswith('指定') or title.startswith('核准'):
-            return 'approval'  # 核准/指定型
+            return 'law_approval'  # 核准/指定型
         elif title.startswith('調降') or title.startswith('調整'):
-            return 'adjustment'  # 調整型
+            return 'law_adjustment'  # 調整型
         elif title.startswith('公告'):
-            return 'notice'  # 公告型
+            return 'law_notice'  # 公告型（程序性）
         else:
-            return 'other'
+            return 'law_other'
 
     def _extract_metadata(self, soup: BeautifulSoup, title: str) -> Dict[str, Any]:
         """
