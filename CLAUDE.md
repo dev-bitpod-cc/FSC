@@ -10,6 +10,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 最新更新 (2025-11-21)
 
+### 🌐 前台查詢網頁部署
+
+**部署專案**：`FSC-deploy` (~/Projects/FSC-deploy)
+**GitHub**：git@github.com:dev-bitpod-cc/fsc-qa
+**Streamlit Cloud**：自動部署
+
+**功能特色**：
+- ✅ 多資料來源查詢（裁罰案件、法令函釋、重要公告）
+- ✅ 動態系統提示（根據選取的資料來源組合）
+- ✅ 6 個範例問題（來自 Sanction-Deploy）
+- ✅ 來源名稱解析（Gemini file ID → 可讀格式）
+- ✅ 來源類型圖示（⚖️ 裁罰、📜 函釋、📢 公告）
+- ✅ sources=0 自動重試機制
+
+**Store 配置**：
+| Store | Store ID | 筆數 |
+|-------|----------|------|
+| fsc-penalties-plaintext | fileSearchStores/fscpenaltiesplaintext-4f87t5uexgui | 490 |
+| fsc-law-interpretations | fileSearchStores/fsclawinterpretations-zz5pwrly06hz | 2,872 |
+| fsc-announcements | fileSearchStores/fscannouncements-o94q0kmo2zxb | 1,642 |
+
+**Mapping 檔案**：
+- `data/penalties/gemini_id_mapping.json` - file ID → document ID
+- `data/penalties/file_mapping.json` - document ID → display_name
+
+**背景上傳狀態** (PID 64485)：
+- 腳本：`scripts/reupload_to_file_search_stores.py`
+- 日誌：`logs/reupload_to_stores_20251121_155007.log`
+- 進度：~330/4,306 (約 7.7%)，持續進行中
+
+---
+
 ### 🎯 統一 Plain Text 優化器架構 & 重要公告功能
 
 **背景**：統一三種資料類型（裁罰、法令函釋、重要公告）的格式化策略，使用 Plain Text 以獲得更好的 RAG 檢索效果
